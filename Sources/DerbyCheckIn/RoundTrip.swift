@@ -1,4 +1,5 @@
 import DerbyCore
+import DerbyKit
 import Foundation
 
 /// `DerbyCheckIn --roundtrip <roster.csv> <output folder>` imports a roster into a

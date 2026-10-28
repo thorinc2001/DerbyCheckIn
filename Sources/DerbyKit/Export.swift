@@ -3,7 +3,7 @@ import DerbyCore
 
 /// Import and export on the Mac: file panels and the export folder around the shared roster code.
 extension Store {
-    func export(checkedInOnly: Bool) {
+    public func export(checkedInOnly: Bool) {
         let racers = (checkedInOnly ? data.racers.filter(\.isCheckedIn) : data.racers).sorted(by: Racer.displayOrder)
         guard !racers.isEmpty else {
             message = checkedInOnly ? "No racers are checked in yet." : "There are no racers to export."
@@ -37,7 +37,7 @@ extension Store {
     /// Writes "GPRM Roster.csv" plus photos named by car number, and returns the new folder.
     /// Images/<car#>.jpg is the racer photo (or the car photo if there is none) and is what
     /// the ImageFile column points to; Car Photos/<car#>.jpg holds every car photo.
-    func writeExport(_ racers: [Racer], into base: URL) throws -> URL {
+    public func writeExport(_ racers: [Racer], into base: URL) throws -> URL {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HHmm"
         let dir = base.appendingPathComponent("\(data.eventName) Export \(formatter.string(from: Date()))", isDirectory: true)
@@ -61,7 +61,7 @@ extension Store {
         return dir
     }
 
-    func importRoster() {
+    public func importRoster() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .tabSeparatedText, .plainText]
         panel.message = "Choose a GPRM roster or other CSV with a header row (First Name, Last Name, Car#, Rank…)"

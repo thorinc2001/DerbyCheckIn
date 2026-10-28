@@ -5,16 +5,16 @@ import SwiftUI
 /// Holds the event and saves it, with its photos, to the data folder:
 /// ~/Documents/Derby Check-In unless moved (for example to OneDrive or Google Drive) in Settings.
 @MainActor
-final class Store: ObservableObject {
-    @Published var data = EventData() { didSet { if !isLoading { scheduleSave() } } }
-    @Published var selection: Racer.ID?
+public final class Store: ObservableObject {
+    @Published public var data = EventData() { didSet { if !isLoading { scheduleSave() } } }
+    @Published public var selection: Racer.ID?
     /// Shown to the user as an alert.
-    @Published var message: String?
+    @Published public var message: String?
     /// Shown as an alert in the Settings window.
-    @Published var settingsMessage: String?
+    @Published public var settingsMessage: String?
 
-    @Published private(set) var folder: URL
-    var photosFolder: URL { folder.appendingPathComponent("Photos", isDirectory: true) }
+    @Published public private(set) var folder: URL
+    public var photosFolder: URL { folder.appendingPathComponent("Photos", isDirectory: true) }
     private var dataFile: URL { folder.appendingPathComponent("event.json") }
     private var saveTask: Task<Void, Never>?
     private var isLoading = false
@@ -22,14 +22,14 @@ final class Store: ObservableObject {
     private let remembersFolder: Bool
 
     /// Folder name in Documents. Derby Web Check In sets its own so the two apps never share an event by accident.
-    static var appFolderName = "Derby Check-In"
-    static var defaultFolder: URL {
+    public static var appFolderName = "Derby Check-In"
+    public static var defaultFolder: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(appFolderName, isDirectory: true)
     }
     private static let folderKey = "dataFolder"
 
-    init(folder custom: URL? = nil) {
+    public init(folder custom: URL? = nil) {
         remembersFolder = custom == nil
         if let custom {
             folder = custom
@@ -68,7 +68,7 @@ final class Store: ObservableObject {
     // MARK: Data folder
 
     /// The event saved in a folder, if it has one that can be read.
-    static func event(in folder: URL) -> EventData? {
+    public static func event(in folder: URL) -> EventData? {
         guard let raw = try? Data(contentsOf: folder.appendingPathComponent("event.json")) else { return nil }
         return try? decoder.decode(EventData.self, from: raw)
     }
@@ -76,7 +76,7 @@ final class Store: ObservableObject {
     /// Switches to another data folder. With `bringCurrentEvent`, this event and its photos
     /// are copied there (replacing any event already in it); otherwise the event already
     /// in that folder is opened. The old folder is left untouched as a backup.
-    func useDataFolder(_ newFolder: URL, bringCurrentEvent: Bool) {
+    public func useDataFolder(_ newFolder: URL, bringCurrentEvent: Bool) {
         let newFolder = newFolder.standardizedFileURL
         guard newFolder != folder.standardizedFileURL else { return }
         saveTask?.cancel()
@@ -145,7 +145,7 @@ final class Store: ObservableObject {
         }
     }
 
-    func save() {
+    public func save() {
         do {
             try Self.encoder.encode(data).write(to: dataFile, options: .atomic)
         } catch {
@@ -157,7 +157,7 @@ final class Store: ObservableObject {
 
     /// Edits go through the shared check-in rules, so the Mac app and the web
     /// version behave the same.
-    func binding(_ id: Racer.ID) -> Binding<Racer> {
+    public func binding(_ id: Racer.ID) -> Binding<Racer> {
         Binding(
             get: { self.data.racers.first { $0.id == id } ?? Racer(id: id) },
             set: { new in
@@ -168,15 +168,15 @@ final class Store: ObservableObject {
         )
     }
 
-    func addRacer(rank: String = "") {
+    public func addRacer(rank: String = "") {
         selection = data.addRacer(rank: rank).id
     }
 
-    func addCar(for racer: Racer) {
+    public func addCar(for racer: Racer) {
         selection = data.addCar(for: racer).id
     }
 
-    func deleteRacer(_ id: Racer.ID) {
+    public func deleteRacer(_ id: Racer.ID) {
         guard let racer = data.racers.first(where: { $0.id == id }) else { return }
         for file in [racer.racerPhoto, racer.carPhoto].compactMap({ $0 }) {
             try? FileManager.default.removeItem(at: photosFolder.appendingPathComponent(file))
@@ -187,11 +187,11 @@ final class Store: ObservableObject {
 
     // MARK: Photos
 
-    func photoURL(_ filename: String) -> URL {
+    public func photoURL(_ filename: String) -> URL {
         photosFolder.appendingPathComponent(filename)
     }
 
-    func setPhoto(_ image: NSImage?, kind: PhotoKind, racerID: Racer.ID) {
+    public func setPhoto(_ image: NSImage?, kind: PhotoKind, racerID: Racer.ID) {
         guard let i = data.racers.firstIndex(where: { $0.id == racerID }) else { return }
         let old = kind == .racer ? data.racers[i].racerPhoto : data.racers[i].carPhoto
         var newName: String?
@@ -214,7 +214,7 @@ final class Store: ObservableObject {
         if kind == .racer { data.racers[i].racerPhoto = newName } else { data.racers[i].carPhoto = newName }
     }
 
-    func choosePhotoFile(kind: PhotoKind, racerID: Racer.ID) {
+    public func choosePhotoFile(kind: PhotoKind, racerID: Racer.ID) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.message = "Choose a \(kind.rawValue) photo"
@@ -226,7 +226,7 @@ final class Store: ObservableObject {
         setPhoto(image, kind: kind, racerID: racerID)
     }
 
-    func showDataFolder() {
+    public func showDataFolder() {
         NSWorkspace.shared.activateFileViewerSelecting([folder])
     }
 }

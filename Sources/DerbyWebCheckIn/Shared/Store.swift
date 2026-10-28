@@ -1,1 +1,0 @@
-../../DerbyCheckIn/Store.swift

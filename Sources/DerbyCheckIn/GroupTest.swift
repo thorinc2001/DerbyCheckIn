@@ -1,4 +1,5 @@
 import DerbyCore
+import DerbyKit
 import Foundation
 
 /// `DerbyCheckIn --grouptest <roster.csv> <old event.json> <scratch folder>` checks race-group

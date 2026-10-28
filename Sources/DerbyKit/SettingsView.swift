@@ -8,11 +8,13 @@ enum SettingsTab: String {
 }
 
 /// The Settings window (⌘,): General, Race Groups and Storage tabs.
-struct SettingsView: View {
+public struct SettingsView: View {
     @EnvironmentObject var store: Store
     @AppStorage(SettingsTab.key) private var tab = SettingsTab.general.rawValue
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         TabView(selection: $tab) {
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
@@ -34,10 +36,12 @@ struct SettingsView: View {
 }
 
 /// Opens Settings on the Race Groups tab.
-struct OpenGroupsButton: View {
+public struct OpenGroupsButton: View {
     @Environment(\.openSettings) private var openSettings
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         Button("Edit Race Groups…", systemImage: "list.number") {
             UserDefaults.standard.set(SettingsTab.groups.rawValue, forKey: SettingsTab.key)
             openSettings()
@@ -69,16 +73,16 @@ struct GeneralSettings: View {
 // MARK: Storage
 
 /// A OneDrive or Google Drive folder synced to this Mac by its desktop app.
-struct CloudFolder: Identifiable, Hashable {
-    enum Service { case oneDrive, googleDrive }
-    let service: Service
-    let name: String
-    let url: URL
-    var id: URL { url }
+public struct CloudFolder: Identifiable, Hashable {
+    public enum Service { case oneDrive, googleDrive }
+    public let service: Service
+    public let name: String
+    public let url: URL
+    public var id: URL { url }
 
     /// Finds synced folders. Both apps keep them in ~/Library/CloudStorage on current macOS;
     /// older versions used ~/OneDrive or ~/Google Drive.
-    static func detect(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [CloudFolder] {
+    public static func detect(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [CloudFolder] {
         let fm = FileManager.default
         var found: [CloudFolder] = []
         let storage = home.appendingPathComponent("Library/CloudStorage", isDirectory: true)
@@ -106,7 +110,7 @@ struct CloudFolder: Identifiable, Hashable {
     }
 
     /// The service a data folder lives in, if any.
-    static func service(of folder: URL, in clouds: [CloudFolder]) -> CloudFolder? {
+    public static func service(of folder: URL, in clouds: [CloudFolder]) -> CloudFolder? {
         clouds.first { folder.standardizedFileURL.path.hasPrefix($0.url.standardizedFileURL.path) }
     }
 }

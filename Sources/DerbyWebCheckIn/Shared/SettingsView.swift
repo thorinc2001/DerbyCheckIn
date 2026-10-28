@@ -1,1 +1,0 @@
-../../DerbyCheckIn/SettingsView.swift
