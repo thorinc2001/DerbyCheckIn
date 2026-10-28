@@ -1,3 +1,4 @@
+import DerbyCore
 import AppKit
 
 /// `DerbyCheckIn --storagetest <scratch folder>` checks cloud-folder detection and moving

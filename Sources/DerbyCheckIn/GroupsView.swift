@@ -1,3 +1,4 @@
+import DerbyCore
 import SwiftUI
 
 /// Edits the race groups: GPRM Rank, Subgroup name, and the first car number of each series.
@@ -29,7 +30,7 @@ struct GroupsView: View {
 
             Divider()
             HStack {
-                Button("Add Group", systemImage: "plus") { store.addGroup() }
+                Button("Add Group", systemImage: "plus") { store.data.addGroup() }
                 Spacer()
                 Text("Press Return to save a change. Drag rows to reorder. Next Available fills each group's numbers from its start.")
                     .font(.caption)
@@ -44,8 +45,8 @@ struct GroupsView: View {
             isPresented: Binding(get: { ui.renumberGroup != nil }, set: { if !$0 { ui.renumberGroup = nil } }),
             presenting: renumberTarget
         ) { group in
-            Button("Renumber \(store.carCount(rank: group.rank)) Cars") {
-                store.renumber(group.id, onlyUnnumbered: false)
+            Button("Renumber \(store.data.carCount(rank: group.rank)) Cars") {
+                store.settingsMessage = store.data.renumber(group.id, onlyUnnumbered: false)
             }
         } message: { group in
             Text("Cars get new numbers from \(group.startNumber) up, in last-name order. Any car already labelled will need a new number label.")
@@ -68,16 +69,16 @@ struct GroupRow: View {
     let onRenumberAll: () -> Void
 
     var body: some View {
-        let count = store.carCount(rank: group.rank)
+        let count = store.data.carCount(rank: group.rank)
         let canNumber = group.startNumber > 0 && count > 0
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 12) {
-                TextField("Rank", value: Binding(get: { group.rank }, set: { store.renameRank(group.id, to: $0) }),
+                TextField("Rank", value: Binding(get: { group.rank }, set: { store.settingsMessage = store.data.renameRank(group.id, to: $0) }),
                           format: PlainText())
                     .frame(width: Self.rankWidth)
-                TextField("Subgroup", value: Binding(get: { group.subgroup }, set: { store.renameSubgroup(group.id, to: $0) }),
+                TextField("Subgroup", value: Binding(get: { group.subgroup }, set: { store.data.renameSubgroup(group.id, to: $0) }),
                           format: PlainText())
-                TextField("Start", value: Binding(get: { group.startNumber }, set: { store.setStartNumber(group.id, to: $0) }),
+                TextField("Start", value: Binding(get: { group.startNumber }, set: { store.data.setStartNumber(group.id, to: $0) }),
                           format: .number.grouping(.never))
                     .frame(width: Self.startWidth)
                 Text("\(count)")
@@ -85,12 +86,12 @@ struct GroupRow: View {
                     .foregroundStyle(.secondary)
                     .frame(width: Self.countWidth, alignment: .trailing)
                 Menu {
-                    Button("Number Cars Without a Number") { store.renumber(group.id, onlyUnnumbered: true) }
+                    Button("Number Cars Without a Number") { store.settingsMessage = store.data.renumber(group.id, onlyUnnumbered: true) }
                         .disabled(!canNumber)
                     Button("Renumber All Cars from \(group.startNumber)…", action: onRenumberAll)
                         .disabled(!canNumber)
                     Divider()
-                    Button("Delete Group", role: .destructive) { store.deleteGroup(group.id) }
+                    Button("Delete Group", role: .destructive) { store.settingsMessage = store.data.deleteGroup(group.id) }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -101,7 +102,7 @@ struct GroupRow: View {
             .labelsHidden()
             .textFieldStyle(.roundedBorder)
 
-            if let problem = store.startNumberProblem(group) {
+            if let problem = store.data.startNumberProblem(group) {
                 Label(problem, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
@@ -117,4 +118,9 @@ struct PlainText: ParseableFormatStyle, ParseStrategy {
     var parseStrategy: PlainText { self }
     func format(_ value: String) -> String { value }
     func parse(_ value: String) throws -> String { value.trimmingCharacters(in: .whitespaces) }
+}
+
+/// View-local state, kept in an ObservableObject while the app builds without the @State macro.
+final class GroupsState: ObservableObject {
+    @Published var renumberGroup: RaceGroup.ID?
 }

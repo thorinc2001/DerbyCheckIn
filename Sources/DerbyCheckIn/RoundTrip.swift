@@ -1,3 +1,4 @@
+import DerbyCore
 import Foundation
 
 /// `DerbyCheckIn --roundtrip <roster.csv> <output folder>` imports a roster into a
@@ -13,9 +14,9 @@ enum RoundTrip {
         do {
             let store = Store(folder: output.appendingPathComponent("data", isDirectory: true))
             let text = try String(contentsOf: input, encoding: .utf8)
-            print(store.importRoster(text: text))
-            print(store.importRoster(text: text))  // a second import must add nothing
-            let problems = store.exportProblems(store.data.racers)
+            print(store.data.importRoster(text: text))
+            print(store.data.importRoster(text: text))  // a second import must add nothing
+            let problems = store.data.exportProblems(store.data.racers)
             if !problems.isEmpty { print("Export problems:\n" + problems.joined(separator: "\n")) }
             let dir = try store.writeExport(store.data.racers, into: output)
             print("Exported to \(dir.path)")

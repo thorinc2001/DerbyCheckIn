@@ -1,3 +1,4 @@
+import DerbyCore
 import SwiftUI
 
 struct RacerDetailView: View {
@@ -7,24 +8,12 @@ struct RacerDetailView: View {
 
     private var maxWeight: String { store.data.maxWeightOz.formatted() }
 
-    /// Choosing a group sets both GPRM fields: Rank and Subgroup.
-    private var rankBinding: Binding<String> {
-        Binding(
-            get: { racer.rank },
-            set: { rank in
-                racer.rank = rank
-                racer.subgroup = store.data.groups.first { $0.rank == rank }?.subgroup ?? ""
-                if racer.carNumber <= 0 && !rank.isEmpty { racer.carNumber = store.nextCarNumber(for: racer) }
-            }
-        )
-    }
-
     var body: some View {
         Form {
             Section("Racer") {
                 TextField("First name", text: $racer.firstName)
                 TextField("Last name", text: $racer.lastName)
-                Picker("Race group", selection: rankBinding) {
+                Picker("Race group", selection: $racer.rank) {
                     Text("Choose…").tag("")
                     ForEach(store.data.groups) { Text($0.name).tag($0.rank) }
                     if !racer.rank.isEmpty && !store.data.groups.contains(where: { $0.rank == racer.rank }) {
@@ -39,12 +28,12 @@ struct RacerDetailView: View {
                         TextField("Car number", value: $racer.carNumber, format: .number.grouping(.never))
                             .labelsHidden()
                             .frame(width: 100)
-                        Button("Next Available") { racer.carNumber = store.nextCarNumber(for: racer) }
+                        Button("Next Available") { racer.carNumber = store.data.nextCarNumber(for: racer) }
                             .disabled(racer.rank.isEmpty)
                             .help("Next free number in this group's series")
                     }
                 }
-                if let problem = store.carNumberProblem(for: racer) {
+                if let problem = store.data.carNumberProblem(for: racer) {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
@@ -126,15 +115,6 @@ struct RacerDetailView: View {
         }
         .formStyle(.grouped)
         .navigationTitle(racer.fullName.isEmpty ? "New Racer" : racer.fullName)
-        .onChange(of: racer.carName) { _, name in
-            if name.count > maxCarNameLength { racer.carName = String(name.prefix(maxCarNameLength)) }
-        }
-        .onChange(of: racer.weightOz) { _, weight in
-            racer.inspection.weightOK = weight > 0 && weight <= store.data.maxWeightOz
-        }
-        .onChange(of: racer.inspection.allChecked) { _, all in
-            if all && racer.inspection.passed == nil { racer.inspection.passed = true }
-        }
         .sheet(item: $ui.cameraFor) { kind in
             CameraSheet(title: kind == .racer ? "Racer Photo" : "Car Photo") { image in
                 store.setPhoto(image, kind: kind, racerID: racer.id)
@@ -158,7 +138,7 @@ struct RacerDetailView: View {
                 Button("Undo Check-In") { racer.checkedInAt = nil }
             }
         } else {
-            let blocker = store.checkInBlocker(racer)
+            let blocker = store.data.checkInBlocker(racer)
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     if let blocker {

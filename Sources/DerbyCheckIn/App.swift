@@ -1,3 +1,4 @@
+import DerbyCore
 import SwiftUI
 
 @main
@@ -71,7 +72,7 @@ struct ContentView: View {
                 }
             }
             .filter { q.isEmpty || $0.fullName.lowercased().contains(q) || String($0.carNumber) == q || $0.carName.lowercased().contains(q) }
-            .sorted { ($0.lastName.lowercased(), $0.firstName.lowercased(), $0.carNumber) < ($1.lastName.lowercased(), $1.firstName.lowercased(), $1.carNumber) }
+            .sorted(by: Racer.displayOrder)
     }
 
     var body: some View {

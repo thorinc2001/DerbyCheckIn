@@ -1,3 +1,4 @@
+import DerbyCore
 import AppKit
 import Combine
 import Foundation
@@ -110,7 +111,7 @@ final class WebAPI {
             return state()
 
         case ("POST", "groups", 1):
-            store.addGroup()
+            store.data.addGroup()
             return state()
         case ("PUT", "groups", 2) where p[1] == "order":
             let ids = (body["ids"] as? [String] ?? []).compactMap(UUID.init(uuidString:))
@@ -120,22 +121,22 @@ final class WebAPI {
             return state()
         case ("PATCH", "groups", 2):
             return withGroup(p[1]) { group in
-                if let v = body["rank"] as? String { store.renameRank(group.id, to: v) }
-                if let v = body["subgroup"] as? String { store.renameSubgroup(group.id, to: v) }
-                if let v = body["startNumber"] as? Int { store.setStartNumber(group.id, to: v) }
-                return state(message: takeMessage())
+                var note: String?
+                if let v = body["rank"] as? String { note = store.data.renameRank(group.id, to: v) }
+                if let v = body["subgroup"] as? String { store.data.renameSubgroup(group.id, to: v) }
+                if let v = body["startNumber"] as? Int { store.data.setStartNumber(group.id, to: v) }
+                return state(message: note)
             }
         case ("DELETE", "groups", 2):
-            return withGroup(p[1]) { store.deleteGroup($0.id); return state(message: takeMessage()) }
+            return withGroup(p[1]) { state(message: store.data.deleteGroup($0.id)) }
         case ("POST", "groups", 3) where p[2] == "renumber":
             return withGroup(p[1]) {
-                store.renumber($0.id, onlyUnnumbered: body["onlyUnnumbered"] as? Bool ?? true)
-                return state(message: takeMessage())
+                state(message: store.data.renumber($0.id, onlyUnnumbered: body["onlyUnnumbered"] as? Bool ?? true))
             }
 
         case ("POST", "import", 1):
             let text = String(data: request.body, encoding: .utf8) ?? String(data: request.body, encoding: .windowsCP1252) ?? ""
-            let summary = store.importRoster(text: text)
+            let summary = store.data.importRoster(text: text)
             return state(message: summary)
         case ("GET", "export", 1):
             return export(checkedInOnly: request.query["checkedInOnly"] == "1")
@@ -143,12 +144,6 @@ final class WebAPI {
         default:
             return .error("Not found", status: 404)
         }
-    }
-
-    /// A message a group action left for the user, shown in the browser that asked for it.
-    private func takeMessage() -> String? {
-        defer { store.settingsMessage = nil }
-        return store.settingsMessage
     }
 
     private func withRacer(_ id: String, _ action: (Racer) -> HTTPResponse) -> HTTPResponse {
@@ -166,27 +161,12 @@ final class WebAPI {
     }
 
     /// Applies only the fields a browser changed, so two people editing different
-    /// fields of the same racer don't overwrite each other. Mirrors the desktop app's rules.
+    /// fields of the same racer don't overwrite each other. The same rules as the Mac app apply.
     private func patchRacer(_ old: Racer, _ patch: [String: Any]) -> HTTPResponse {
         var patch = patch
         for locked in ["id", "racerPhoto", "carPhoto", "checkedInAt"] { patch.removeValue(forKey: locked) }
-        guard var racer = try? merged(old, patch) else { return .error("Couldn't apply that change.", status: 400) }
-
-        racer.carName = String(racer.carName.prefix(maxCarNameLength))
-        if racer.weightOz != old.weightOz {
-            racer.inspection.weightOK = racer.weightOz > 0 && racer.weightOz <= store.data.maxWeightOz
-        }
-        if racer.inspection.allChecked && !old.inspection.allChecked && racer.inspection.passed == nil {
-            racer.inspection.passed = true
-        }
-        if racer.rank != old.rank {
-            racer.subgroup = store.data.groups.first { $0.rank == racer.rank }?.subgroup ?? ""
-        }
-        replace(racer)
-        if racer.rank != old.rank && racer.carNumber <= 0 && !racer.rank.isEmpty {
-            racer.carNumber = store.nextCarNumber(for: racer)
-            replace(racer)
-        }
+        guard let racer = try? merged(old, patch) else { return .error("Couldn't apply that change.", status: 400) }
+        replace(store.data.applyingEditRules(racer, was: old))
         return state()
     }
 
@@ -194,7 +174,7 @@ final class WebAPI {
         var racer = racer
         switch action {
         case "checkin":
-            if let blocker = store.checkInBlocker(racer) { return .error(blocker, status: 409) }
+            if let blocker = store.data.checkInBlocker(racer) { return .error(blocker, status: 409) }
             racer.checkedInAt = Date()
             replace(racer)
             return state()
@@ -203,7 +183,7 @@ final class WebAPI {
             replace(racer)
             return state()
         case "next-number":
-            racer.carNumber = store.nextCarNumber(for: racer)
+            racer.carNumber = store.data.nextCarNumber(for: racer)
             replace(racer)
             return state()
         case "add-car":
@@ -239,7 +219,7 @@ final class WebAPI {
         guard !racers.isEmpty else {
             return .error(checkedInOnly ? "No racers are checked in yet." : "There are no racers to export.", status: 409)
         }
-        let problems = store.exportProblems(racers)
+        let problems = store.data.exportProblems(racers)
         guard problems.isEmpty else {
             return .error("Fix these before exporting:\n\n" + problems.prefix(12).joined(separator: "\n")
                           + (problems.count > 12 ? "\n…and \(problems.count - 12) more." : ""), status: 409)
@@ -249,7 +229,7 @@ final class WebAPI {
         defer { try? fm.removeItem(at: temp) }
         do {
             try fm.createDirectory(at: temp, withIntermediateDirectories: true)
-            let sorted = racers.sorted { ($0.lastName.lowercased(), $0.firstName.lowercased(), $0.carNumber) < ($1.lastName.lowercased(), $1.firstName.lowercased(), $1.carNumber) }
+            let sorted = racers.sorted(by: Racer.displayOrder)
             let dir = try store.writeExport(sorted, into: temp)
             let zip = temp.appendingPathComponent("export.zip")
             let ditto = Process()
@@ -287,10 +267,10 @@ final class WebAPI {
     private func state(selected: Racer.ID? = nil, message: String? = nil) -> HTTPResponse {
         var problems: [String: Problems] = [:]
         for r in store.data.racers {
-            problems[r.id.uuidString] = Problems(carNumber: store.carNumberProblem(for: r), checkIn: store.checkInBlocker(r))
+            problems[r.id.uuidString] = Problems(carNumber: store.data.carNumberProblem(for: r), checkIn: store.data.checkInBlocker(r))
         }
         var counts: [String: Int] = [:]
-        for g in store.data.groups { counts[g.rank] = store.carCount(rank: g.rank) }
+        for g in store.data.groups { counts[g.rank] = store.data.carCount(rank: g.rank) }
         let value = State(version: version, event: store.data, problems: problems, counts: counts,
                           folder: store.folder.path, selected: selected?.uuidString, message: message)
         guard let data = try? Self.encoder.encode(value) else { return .error("Couldn't read the event.", status: 500) }

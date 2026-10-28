@@ -1,3 +1,4 @@
+import DerbyCore
 import Foundation
 
 /// `DerbyCheckIn --grouptest <roster.csv> <old event.json> <scratch folder>` checks race-group
@@ -23,44 +24,44 @@ enum GroupTest {
 
         store.data.racers = []  // the copied event may hold cars that clash with the roster
         let before = store.data.racers.count
-        _ = store.importRoster(text: (try? String(contentsOfFile: args[i + 1], encoding: .utf8)) ?? "")
+        _ = store.data.importRoster(text: (try? String(contentsOfFile: args[i + 1], encoding: .utf8)) ?? "")
         check("roster imports 91 cars", store.data.racers.count == before + 91)
 
         var bear = Racer(); bear.rank = "CS_3_Bears"
-        check("next Bears number is 411 (400-410 taken)", store.nextCarNumber(for: bear) == 411)
+        check("next Bears number is 411 (400-410 taken)", store.data.nextCarNumber(for: bear) == 411)
         var outlaw = Racer(); outlaw.rank = "Outlaw"
-        check("next Outlaw number is 6 (1-5 taken)", store.nextCarNumber(for: outlaw) == 6)
+        check("next Outlaw number is 6 (1-5 taken)", store.data.nextCarNumber(for: outlaw) == 6)
 
         let lions = group("CS_K_Lions")
-        store.setStartNumber(lions.id, to: 150)
+        store.data.setStartNumber(lions.id, to: 150)
         var lion = Racer(); lion.rank = "CS_K_Lions"
-        check("new start number used for next car", store.nextCarNumber(for: lion) == 150)
+        check("new start number used for next car", store.data.nextCarNumber(for: lion) == 150)
 
-        store.renumber(lions.id, onlyUnnumbered: false)
+        store.settingsMessage = store.data.renumber(lions.id, onlyUnnumbered: false)
         let lionNumbers = store.data.racers.filter { $0.rank == "CS_K_Lions" }.map(\.carNumber).sorted()
         check("renumber gives Lions 150-157", lionNumbers == Array(150...157))
-        check("renumber leaves no duplicates", store.exportProblems(store.data.racers.filter { $0.carNumber > 0 }).isEmpty)
+        check("renumber leaves no duplicates", store.data.exportProblems(store.data.racers.filter { $0.carNumber > 0 }).isEmpty)
 
-        store.renameRank(lions.id, to: "CS_K_Lion_Cubs")
-        check("renaming a Rank moves its cars", store.carCount(rank: "CS_K_Lion_Cubs") == 8 && store.carCount(rank: "CS_K_Lions") == 0)
-        store.renameRank(lions.id, to: "cs_3_bears")
+        store.settingsMessage = store.data.renameRank(lions.id, to: "CS_K_Lion_Cubs")
+        check("renaming a Rank moves its cars", store.data.carCount(rank: "CS_K_Lion_Cubs") == 8 && store.data.carCount(rank: "CS_K_Lions") == 0)
+        store.settingsMessage = store.data.renameRank(lions.id, to: "cs_3_bears")
         check("duplicate Rank is refused", group("CS_K_Lion_Cubs").id == lions.id && store.settingsMessage != nil)
         store.settingsMessage = nil
 
-        store.renameSubgroup(lions.id, to: "Lion Cubs")
+        store.data.renameSubgroup(lions.id, to: "Lion Cubs")
         check("renaming a Subgroup updates its cars", store.data.racers.filter { $0.rank == "CS_K_Lion_Cubs" }.allSatisfy { $0.subgroup == "Lion Cubs" })
 
-        store.deleteGroup(group("CS_3_Bears").id)
+        store.settingsMessage = store.data.deleteGroup(group("CS_3_Bears").id)
         check("group with cars can't be deleted", store.data.groups.contains { $0.rank == "CS_3_Bears" } && store.settingsMessage != nil)
 
-        store.addGroup()
+        store.data.addGroup()
         let added = store.data.groups.last!
         check("new group starts at next free hundred (1300)", added.startNumber == 1300)
-        store.deleteGroup(added.id)
+        store.settingsMessage = store.data.deleteGroup(added.id)
         check("empty group can be deleted", !store.data.groups.contains { $0.id == added.id })
 
-        store.setStartNumber(group("CS_2_Wolves").id, to: 400)
-        check("matching start numbers are flagged", store.startNumberProblem(group("CS_2_Wolves")) != nil)
+        store.data.setStartNumber(group("CS_2_Wolves").id, to: 400)
+        check("matching start numbers are flagged", store.data.startNumberProblem(group("CS_2_Wolves")) != nil)
 
         store.save()
         let reloaded = Store(folder: folder)

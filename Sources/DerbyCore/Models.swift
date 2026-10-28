@@ -1,74 +1,86 @@
 import Foundation
 
 /// GPRM truncates car names longer than this.
-let maxCarNameLength = 20
+public let maxCarNameLength = 20
 
-struct Racer: Identifiable, Codable, Hashable {
-    var id = UUID()
+public struct Racer: Identifiable, Codable, Hashable, Sendable {
+    public var id = UUID()
     /// 0 means "not assigned yet". GPRM requires a positive, unique whole number.
-    var carNumber = 0
-    var firstName = ""
-    var lastName = ""
+    public var carNumber = 0
+    public var firstName = ""
+    public var lastName = ""
     /// GPRM "Rank": the race group, e.g. CS_3_Bears.
-    var rank = ""
+    public var rank = ""
     /// GPRM "Subgroup": the group's display name, e.g. Bears.
-    var subgroup = ""
-    var carName = ""
+    public var subgroup = ""
+    public var carName = ""
     /// 0 means "not weighed yet". Used for inspection only; GPRM's roster has no weight column.
-    var weightOz = 0.0
-    var inspection = Inspection()
-    var notes = ""
+    public var weightOz = 0.0
+    public var inspection = Inspection()
+    public var notes = ""
     /// File names inside the event's Photos folder.
-    var racerPhoto: String?
-    var carPhoto: String?
-    var checkedInAt: Date?
+    public var racerPhoto: String?
+    public var carPhoto: String?
+    public var checkedInAt: Date?
     // GPRM flags, carried through import and export.
-    var exclude = false
-    var finalist = false
-    var grandFinalist = false
-    var grandTurtle = false
+    public var exclude = false
+    public var finalist = false
+    public var grandFinalist = false
+    public var grandTurtle = false
 
-    var fullName: String {
+    public init(id: UUID = UUID()) {
+        self.id = id
+    }
+
+    public var fullName: String {
         "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
     }
 
-    var groupName: String { subgroup.isEmpty ? rank : subgroup }
+    public var groupName: String { subgroup.isEmpty ? rank : subgroup }
 
-    var isCheckedIn: Bool { checkedInAt != nil }
+    public var isCheckedIn: Bool { checkedInAt != nil }
+
+    /// List and export order: last name, first name, then car number.
+    public static func displayOrder(_ a: Racer, _ b: Racer) -> Bool {
+        (a.lastName.lowercased(), a.firstName.lowercased(), a.carNumber)
+            < (b.lastName.lowercased(), b.firstName.lowercased(), b.carNumber)
+    }
 }
 
-struct Inspection: Codable, Hashable {
-    var weightOK = false
-    var dimensionsOK = false
-    var clearanceOK = false
-    var wheelsAxlesOK = false
-    var noLooseParts = false
+public struct Inspection: Codable, Hashable, Sendable {
+    public var weightOK = false
+    public var dimensionsOK = false
+    public var clearanceOK = false
+    public var wheelsAxlesOK = false
+    public var noLooseParts = false
     /// nil = not inspected yet.
-    var passed: Bool?
+    public var passed: Bool?
 
-    var allChecked: Bool {
+    public init() {}
+
+    public var allChecked: Bool {
         weightOK && dimensionsOK && clearanceOK && wheelsAxlesOK && noLooseParts
     }
 }
 
 /// A GPRM race group: a Rank and the Subgroup name shown for it.
-struct RaceGroup: Codable, Hashable, Identifiable {
-    var id = UUID()
-    var rank: String
-    var subgroup: String
+public struct RaceGroup: Codable, Hashable, Identifiable, Sendable {
+    public var id = UUID()
+    public var rank: String
+    public var subgroup: String
     /// First car number for this group's series (e.g. 400 for Bears). 0 = no set start.
-    var startNumber = 0
+    public var startNumber = 0
 
-    var name: String { subgroup.isEmpty || subgroup == rank ? rank : "\(subgroup) (\(rank))" }
+    public var name: String { subgroup.isEmpty || subgroup == rank ? rank : "\(subgroup) (\(rank))" }
 
-    init(rank: String, subgroup: String, startNumber: Int = 0) {
+    public init(rank: String, subgroup: String, startNumber: Int = 0) {
         self.rank = rank
         self.subgroup = subgroup
         self.startNumber = startNumber
     }
 
     // Groups saved before id and startNumber existed still load.
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         rank = try c.decode(String.self, forKey: .rank)
@@ -77,7 +89,7 @@ struct RaceGroup: Codable, Hashable, Identifiable {
     }
 
     /// The pack's groups and number series, from its GPRM roster.
-    static let defaults = [
+    public static let defaults = [
         RaceGroup(rank: "CS_K_Lions", subgroup: "Lions", startNumber: 100),
         RaceGroup(rank: "CS_2_Wolves", subgroup: "Wolves", startNumber: 300),
         RaceGroup(rank: "CS_3_Bears", subgroup: "Bears", startNumber: 400),
@@ -92,23 +104,18 @@ struct RaceGroup: Codable, Hashable, Identifiable {
     ]
 }
 
-enum PhotoKind: String, Identifiable {
+public enum PhotoKind: String, Identifiable, Sendable {
     case racer, car
-    var id: String { rawValue }
+    public var id: String { rawValue }
 }
 
-struct EventData: Codable {
-    var eventName = "Pinewood Derby"
-    var groups = RaceGroup.defaults
-    var maxWeightOz = 5.0
+public struct EventData: Codable, Sendable {
+    public var eventName = "Pinewood Derby"
+    public var groups = RaceGroup.defaults
+    public var maxWeightOz = 5.0
     /// Windows folder on the GPRM PC where exported images will be copied, used for the ImageFile column.
-    var imageFolderOnPC = #"C:\Users\Pack352\Documents\Lisano Enterprises\GrandPrix Race Manager\Images"#
-    var racers: [Racer] = []
-}
+    public var imageFolderOnPC = #"C:\Users\Pack352\Documents\Lisano Enterprises\GrandPrix Race Manager\Images"#
+    public var racers: [Racer] = []
 
-// View-local state. Kept in ObservableObjects instead of @State because the
-// Command Line Tools ship without the SwiftUI macro plugin that @State needs.
-
-final class GroupsState: ObservableObject {
-    @Published var renumberGroup: RaceGroup.ID?
+    public init() {}
 }
