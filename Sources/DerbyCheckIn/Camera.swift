@@ -3,11 +3,66 @@ import DerbyKit
 import AVFoundation
 import SwiftUI
 
-final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
+/// Runs the capture session. AVCaptureSession isn't safe to share between threads, so
+/// everything except creating the preview layer happens on `queue`, one step at a time.
+final class CaptureEngine: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
     let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
-    private let queue = DispatchQueue(label: "camera")
+    private let queue = DispatchQueue(label: "derby.camera")
     private var input: AVCaptureDeviceInput?
+    private var photoTaken: (@Sendable (Data?) -> Void)?
+
+    /// Switches to the camera with this id and starts it. Calls `failed` with a message if it can't.
+    func use(deviceID: String, failed: @escaping @Sendable (String) -> Void) {
+        queue.async { [self] in
+            guard let device = AVCaptureDevice(uniqueID: deviceID) else {
+                failed("That camera is no longer connected.")
+                return
+            }
+            session.beginConfiguration()
+            session.sessionPreset = .photo
+            if let input { session.removeInput(input) }
+            do {
+                let newInput = try AVCaptureDeviceInput(device: device)
+                if session.canAddInput(newInput) {
+                    session.addInput(newInput)
+                    input = newInput
+                }
+                if session.canAddOutput(output) { session.addOutput(output) }
+            } catch {
+                failed("Could not open the camera: \(error.localizedDescription)")
+            }
+            session.commitConfiguration()
+            if !session.isRunning { session.startRunning() }
+        }
+    }
+
+    func stop() {
+        queue.async { [self] in session.stopRunning() }
+    }
+
+    /// Takes a photo and calls `done` with its JPEG or HEIC data, or nil if it failed.
+    func capture(_ done: @escaping @Sendable (Data?) -> Void) {
+        queue.async { [self] in
+            photoTaken = done
+            output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        }
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        let data = photo.fileDataRepresentation()
+        queue.async { [self] in
+            photoTaken?(data)
+            photoTaken = nil
+        }
+    }
+}
+
+/// What the camera sheet shows. Lives on the main actor; hands the session work to CaptureEngine.
+@MainActor
+final class CameraModel: ObservableObject {
+    private let engine = CaptureEngine()
+    var session: AVCaptureSession { engine.session }
 
     @Published var devices: [AVCaptureDevice] = []
     @Published var deviceID = ""
@@ -19,9 +74,9 @@ final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelega
         case .authorized:
             loadDevices()
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async {
-                    if granted { self.loadDevices() } else { self.denied() }
+            AVCaptureDevice.requestAccess(for: .video) { @Sendable [weak self] granted in
+                Task { @MainActor in
+                    if granted { self?.loadDevices() } else { self?.denied() }
                 }
             }
         default:
@@ -46,41 +101,25 @@ final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelega
     }
 
     func select(_ id: String) {
-        guard let device = devices.first(where: { $0.uniqueID == id }) ?? AVCaptureDevice(uniqueID: id) else { return }
         deviceID = id
-        queue.async {
-            self.session.beginConfiguration()
-            self.session.sessionPreset = .photo
-            if let old = self.input { self.session.removeInput(old) }
-            do {
-                let newInput = try AVCaptureDeviceInput(device: device)
-                if self.session.canAddInput(newInput) {
-                    self.session.addInput(newInput)
-                    self.input = newInput
-                }
-                if self.session.canAddOutput(self.output) { self.session.addOutput(self.output) }
-            } catch {
-                DispatchQueue.main.async { self.error = "Could not open the camera: \(error.localizedDescription)" }
-            }
-            self.session.commitConfiguration()
-            if !self.session.isRunning { self.session.startRunning() }
+        engine.use(deviceID: id) { @Sendable [weak self] message in
+            Task { @MainActor in self?.error = message }
         }
     }
 
     func stop() {
-        queue.async { self.session.stopRunning() }
+        engine.stop()
     }
 
     func capture() {
-        queue.async {
-            self.output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
-        }
-    }
-
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        let image = photo.fileDataRepresentation().flatMap(NSImage.init(data:))
-        DispatchQueue.main.async {
-            if let image { self.captured = image } else { self.error = "The photo could not be taken." }
+        engine.capture { @Sendable [weak self] data in
+            Task { @MainActor in
+                if let image = data.flatMap(NSImage.init(data:)) {
+                    self?.captured = image
+                } else {
+                    self?.error = "The photo could not be taken."
+                }
+            }
         }
     }
 }

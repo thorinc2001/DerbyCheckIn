@@ -33,6 +33,22 @@ setting UI state, so each app shows it where it belongs.
 The browser repeats only display logic (sorting, labels). It never decides a rule; it shows
 the `problems` the server sends with every state.
 
+## Concurrency
+
+Swift 6 language mode, zero warnings. Everything UI-facing (`Store`, the views,
+`ServerController`, `CameraModel`, `HTTPServer`'s start and stop) is on the main actor. Two
+things run off it, each on its own serial queue:
+
+- `HTTPConnection` (web server): Network.framework callbacks. Requests reach `WebAPI` through
+  an `@Sendable` handler that awaits the main actor.
+- `CaptureEngine` (camera): every `AVCaptureSession` change. Results come back through
+  `@Sendable` callbacks that hop to the main actor with `Task { @MainActor in … }`.
+
+A closure handed to a queue or framework callback is marked `{ @Sendable in … }`, so it can't
+silently inherit the main actor and crash when it runs elsewhere. After any concurrency
+change, run every background path once: `Tools/check-all.sh` covers the server, and
+DerbyCheckInTests covers the camera queue.
+
 ## Data
 
 - One folder per app: `~/Documents/Derby Check-In` and `~/Documents/Derby Web Check In`,
@@ -49,8 +65,8 @@ Tools/check-all.sh                       # unit tests + web API test, made-up sa
 Tools/check-all.sh ~/Desktop/Rosters.csv # the same with a real roster, plus its export fingerprint
 ```
 
-- `swift test`: DerbyCoreTests (rules, rosters, groups) and DerbyKitTests (Store, photos,
-  export folder, storage moves). Tests use `Tests/Fixtures/sample-roster.csv`, never real
+- `swift test`: DerbyCoreTests (rules, rosters, groups), DerbyKitTests (Store, photos,
+  export folder, storage moves) and DerbyCheckInTests (camera queue). Tests use `Tests/Fixtures/sample-roster.csv`, never real
   racers' names, and temporary folders, never the real event.
 - `Tools/api-test.py`: drives the web API like a browser against a test server on port 8099.
 

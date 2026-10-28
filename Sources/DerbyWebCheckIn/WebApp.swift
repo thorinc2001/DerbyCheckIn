@@ -82,7 +82,7 @@ final class ServerController: ObservableObject {
         port = portOverride ?? (saved > 0 ? saved : 8080)
         api = WebAPI(store: store)
         let api = self.api
-        server = HTTPServer { request in await api.handle(request) }
+        server = HTTPServer { @Sendable request in await api.handle(request) }
         server.onStateChange = { [weak self] problem in
             guard let self else { return }
             self.problem = problem
@@ -165,7 +165,8 @@ final class ServerController: ObservableObject {
             guard interface.hasPrefix("en") || interface.hasPrefix("bridge") else { continue }
             var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
             if getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 {
-                result.append(NetworkAddress(ip: String(cString: host), interface: interface))
+                let ip = String(decoding: host.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                result.append(NetworkAddress(ip: ip, interface: interface))
             }
         }
         return result.sorted { ($0.isSelfAssigned ? 1 : 0, $0.interface) < ($1.isSelfAssigned ? 1 : 0, $1.interface) }

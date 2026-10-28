@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -15,5 +15,6 @@ let package = Package(
         .executableTarget(name: "DerbyWebCheckIn", dependencies: ["DerbyCore", "DerbyKit"], exclude: ["Web"]),
         .testTarget(name: "DerbyCoreTests", dependencies: ["DerbyCore"]),
         .testTarget(name: "DerbyKitTests", dependencies: ["DerbyCore", "DerbyKit"]),
+        .testTarget(name: "DerbyCheckInTests", dependencies: ["DerbyCheckIn"]),
     ]
 )

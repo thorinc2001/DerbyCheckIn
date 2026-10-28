@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-struct HTTPRequest {
+struct HTTPRequest: Sendable {
     var method: String
     /// Percent-decoded path without the query, e.g. /api/racers/123.
     var path: String
@@ -17,7 +17,7 @@ struct HTTPRequest {
     }
 }
 
-struct HTTPResponse {
+struct HTTPResponse: Sendable {
     var status: Int
     var headers: [String: String] = [:]
     var body = Data()
@@ -42,13 +42,15 @@ struct HTTPResponse {
 
 /// A small HTTP/1.1 server on Network.framework: one request per connection, which is
 /// plenty for a handful of check-in computers on a local network.
+/// Started and stopped on the main actor; connections are handled on `queue`.
+@MainActor
 final class HTTPServer {
-    typealias Handler = (HTTPRequest) async -> HTTPResponse
+    typealias Handler = @Sendable (HTTPRequest) async -> HTTPResponse
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "derby.http")
     private let handler: Handler
-    /// Called on the main queue: nil when listening, otherwise an error to show.
+    /// Called on the main actor: nil when listening, otherwise an error to show.
     var onStateChange: ((String?) -> Void)?
 
     init(handler: @escaping Handler) {
@@ -63,15 +65,16 @@ final class HTTPServer {
         let listener = try NWListener(using: params, on: nwPort)
         // Advertised with Bonjour so Macs can find it in Safari's Bonjour list.
         listener.service = NWListener.Service(name: serviceName, type: "_http._tcp")
-        listener.stateUpdateHandler = { [weak self] state in
+        // Network.framework calls these on `queue`, so they must not inherit the main actor.
+        listener.stateUpdateHandler = { @Sendable [weak self] state in
             let message: String?? = switch state {
             case .ready: .some(nil)
             case .failed(let error): .some(Self.describe(error, port: port))
             default: .none
             }
-            if let message { DispatchQueue.main.async { self?.onStateChange?(message) } }
+            if let message { Task { @MainActor in self?.onStateChange?(message) } }
         }
-        listener.newConnectionHandler = { [handler, queue] connection in
+        listener.newConnectionHandler = { @Sendable [handler, queue] connection in
             HTTPConnection(connection: connection, handler: handler).start(on: queue)
         }
         listener.start(queue: queue)
@@ -83,7 +86,7 @@ final class HTTPServer {
         listener = nil
     }
 
-    private static func describe(_ error: NWError, port: UInt16) -> String {
+    nonisolated private static func describe(_ error: NWError, port: UInt16) -> String {
         if case .posix(let code) = error, code == .EADDRINUSE {
             return "Port \(port) is already in use by another program. Choose a different port."
         }
@@ -91,7 +94,9 @@ final class HTTPServer {
     }
 }
 
-private final class HTTPConnection {
+/// One request and its response. Only touched from the server queue's callbacks, one at a
+/// time, plus `send` from the task that ran the handler; NWConnection itself is thread-safe.
+private final class HTTPConnection: @unchecked Sendable {
     private static let maxBody = 30 * 1024 * 1024
     private let connection: NWConnection
     private let handler: HTTPServer.Handler
