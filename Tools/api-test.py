@@ -1,9 +1,21 @@
 """Exercises the Derby Web Check In API like a browser would."""
-import io, json, sys, time, urllib.request, urllib.error, zipfile
+import csv, io, json, sys, time, urllib.request, urllib.error, zipfile
 
 BASE = sys.argv[1]
 ROSTER = sys.argv[2]
 failed = 0
+
+# What to expect, worked out from the roster so any GPRM roster can be used.
+rows = list(csv.DictReader(open(ROSTER, newline="", encoding="utf-8")))
+used = {int(r["Car#"]) for r in rows if r["Car#"].strip().isdigit()}
+def first_free(n, taken):
+    while n in taken:
+        n += 1
+    return n
+bear1 = first_free(400, used)
+bear2 = first_free(400, used | {bear1})
+owner_400 = next(f'{r["First Name"]} {r["Last Name"]}' for r in rows if r["Car#"] == "400")
+lion_count = sum(1 for r in rows if r["Rank"] == "CS_K_Lions")
 
 def check(name, ok):
     global failed
@@ -47,16 +59,16 @@ v0 = st["version"]
 check("starts with the pack's 11 groups", len(st["event"]["groups"]) == 11)
 
 _, st = state("POST", "/api/import", raw=open(ROSTER, "rb").read())
-check("imports the roster", len(st["event"]["racers"]) == 91 and "Imported 91" in st["message"])
+check("imports the roster", len(st["event"]["racers"]) == len(rows) and f"Imported {len(rows)}" in st["message"])
 check("version goes up", st["version"] > v0)
 _, st2 = state("POST", "/api/import", raw=open(ROSTER, "rb").read())
-check("importing twice adds nothing", len(st2["event"]["racers"]) == 91)
+check("importing twice adds nothing", len(st2["event"]["racers"]) == len(rows))
 
 bears = next(g for g in st["event"]["groups"] if g["rank"] == "CS_3_Bears")
 _, st = state("POST", "/api/racers", {"rank": "CS_3_Bears"})
 new_id = st["selected"]
 new = next(r for r in st["event"]["racers"] if r["id"] == new_id)
-check("new Bear gets car #411", new["carNumber"] == 411 and new["subgroup"] == "Bears")
+check(f"new Bear gets car #{bear1}", new["carNumber"] == bear1 and new["subgroup"] == "Bears")
 check("new racer can't check in without a name", "name" in (st["problems"][new_id]["checkIn"] or ""))
 
 s, body, _ = call("POST", f"/api/racers/{new_id}/checkin")
@@ -85,10 +97,10 @@ r = next(r for r in st["event"]["racers"] if r["id"] == new_id)
 check("edits from two computers don't overwrite each other", r["notes"] == "from computer A" and r["carName"] == "Zoom")
 
 _, st = state("PATCH", f"/api/racers/{new_id}", {"carNumber": 400})
-check("duplicate car number is flagged", "already used by Sam Taylor" in (st["problems"][new_id]["carNumber"] or ""))
+check("duplicate car number is flagged", f"already used by {owner_400}" in (st["problems"][new_id]["carNumber"] or ""))
 _, st = state("POST", f"/api/racers/{new_id}/next-number")
 r = next(r for r in st["event"]["racers"] if r["id"] == new_id)
-check("Next Available fixes it", r["carNumber"] == 411)
+check("Next Available fixes it", r["carNumber"] == bear1)
 
 _, st = state("POST", f"/api/racers/{new_id}/checkin")
 r = next(r for r in st["event"]["racers"] if r["id"] == new_id)
@@ -107,7 +119,7 @@ check("bad image refused", s == 400)
 _, st = state("POST", f"/api/racers/{new_id}/add-car")
 second = st["selected"]
 r2 = next(r for r in st["event"]["racers"] if r["id"] == second)
-check("Add Another Car copies the racer and numbers it", r2["fullName" if "fullName" in r2 else "firstName"] in ("Pat", "Pat Tester") and r2["carNumber"] == 412)
+check("Add Another Car copies the racer and numbers it", r2["firstName"] == "Pat" and r2["lastName"] == "Tester" and r2["carNumber"] == bear2)
 
 _, st = state("PATCH", "/api/settings", {"eventName": "Pack 352 Derby 2026", "maxWeightOz": 5.0})
 check("settings saved", st["event"]["eventName"] == "Pack 352 Derby 2026")
@@ -119,7 +131,7 @@ check("group start number and name saved", g["startNumber"] == 150 and g["subgro
 check("renaming a subgroup updates its cars", all(r["subgroup"] == "Lion Cubs" for r in st["event"]["racers"] if r["rank"] == "CS_K_Lions"))
 _, st = state("POST", f"/api/groups/{lions['id']}/renumber", {"onlyUnnumbered": False})
 nums = sorted(r["carNumber"] for r in st["event"]["racers"] if r["rank"] == "CS_K_Lions")
-check("renumber from 150", nums == list(range(150, 158)) and "Numbered 8" in (st["message"] or ""))
+check("renumber from 150", nums == list(range(150, 150 + lion_count)) and f"Numbered {lion_count}" in (st["message"] or ""))
 _, st = state("PATCH", f"/api/groups/{lions['id']}", {"rank": "CS_3_Bears"})
 check("duplicate Rank refused with a message", "already a group" in (st["message"] or ""))
 _, st = state("DELETE", f"/api/groups/{bears['id']}")
@@ -141,9 +153,9 @@ csv_name = next(n for n in names if n.endswith("GPRM Roster.csv"))
 csv = z.read(csv_name).decode()
 lines = csv.split("\r\n")
 check("zip has the GPRM CSV with the right header", lines[0] == "First Name,Last Name,Car#,Car Name,Rank,Subgroup,Passed,Exclude,Finalist,Grand Finalist,Grand Turtle,ImageFile")
-check("only the checked-in car is exported", len([l for l in lines[1:] if l]) == 1 and lines[1].startswith("Pat,Tester,411,Zoom,CS_3_Bears,Bears,True"))
-check("ImageFile points at the GPRM PC folder", lines[1].endswith(r"GrandPrix Race Manager\Images\411.jpg"))
-check("zip has the photo", any(n.endswith("Images/411.jpg") for n in names))
+check("only the checked-in car is exported", len([l for l in lines[1:] if l]) == 1 and lines[1].startswith(f"Pat,Tester,{bear1},Zoom,CS_3_Bears,Bears,True"))
+check("ImageFile points at the GPRM PC folder", lines[1].endswith(rf"GrandPrix Race Manager\Images\{bear1}.jpg"))
+check("zip has the photo", any(n.endswith(f"Images/{bear1}.jpg") for n in names))
 
 s, body, _ = call("GET", "/api/export")
 check("full export blocked by the duplicate car number problem? (none expected)", s == 200)

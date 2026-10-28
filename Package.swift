@@ -13,5 +13,7 @@ let package = Package(
         .executableTarget(name: "DerbyCheckIn", dependencies: ["DerbyCore", "DerbyKit"]),
         // The Web folder is copied into the app bundle by build.sh.
         .executableTarget(name: "DerbyWebCheckIn", dependencies: ["DerbyCore", "DerbyKit"], exclude: ["Web"]),
+        .testTarget(name: "DerbyCoreTests", dependencies: ["DerbyCore"]),
+        .testTarget(name: "DerbyKitTests", dependencies: ["DerbyCore", "DerbyKit"]),
     ]
 )

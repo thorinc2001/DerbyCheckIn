@@ -6,12 +6,6 @@ import SwiftUI
 struct DerbyCheckInApp: App {
     @StateObject private var store = Store()
 
-    init() {
-        RoundTrip.runIfRequested()
-        GroupTest.runIfRequested()
-        StorageTest.runIfRequested()
-    }
-
     var body: some Scene {
         WindowGroup("Derby Check-In") {
             ContentView()

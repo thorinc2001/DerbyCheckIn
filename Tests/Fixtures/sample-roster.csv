@@ -1,0 +1,11 @@
+First Name,Last Name,Car#,Car Name,Rank,Subgroup,Passed,Exclude,Finalist,Grand Finalist,Grand Turtle,ImageFile
+Alex,Avery,405,Comet,CS_3_Bears,Bears,True,False,False,False,False,
+Blair,Brooks,1003,"Fast, Furious",GS_4th_1422,GS_4th_1422,True,False,False,False,False,
+Casey,Cole,1,The Long Car Name Xx,Outlaw,Test Race,True,False,False,False,False,
+Casey,Cole,2,Second Car,Outlaw,Test Race,True,False,False,False,False,
+Casey,Cole,300,Wolf Car,CS_2_Wolves,Wolves,True,False,False,False,False,
+Drew,Diaz,400,Bear One,CS_3_Bears,Bears,True,True,False,False,False,
+Emery,Ellis,401,"Say ""Hi""",CS_3_Bears,Bears,True,False,True,False,False,
+Finley,Fox,100,,CS_K_Lions,Lions,True,False,False,False,False,
+Gray,Green,101,Lion Two,CS_K_Lions,Lions,True,False,False,False,True,
+Harper,Hill,705,Mystery,NEW_Rank_X,Mystery Group,True,False,False,True,False,
