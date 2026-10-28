@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Derby Web Check In</title>
+  <link rel="icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="offline" class="offline" hidden>Can't reach the check-in Mac. Check this computer is on the same network — changes will resume when it's back.</div>
+  <header class="toolbar">
+    <button id="btnBack" class="tb back" title="Back to list" hidden>‹ Racers</button>
+    <img src="icon.png" class="appicon" alt="">
+    <h1 id="eventName">Pinewood Derby</h1>
+    <span class="spacer"></span>
+    <button id="btnGroups" class="tb" title="Edit Race Groups"><span class="i">☰</span><span class="lbl">Race Groups</span></button>
+    <button id="btnImport" class="tb" title="Import a roster"><span class="i">⤓</span><span class="lbl">Import</span></button>
+    <div class="menu-wrap">
+      <button id="btnExport" class="tb" title="Export for GPRM"><span class="i">⤒</span><span class="lbl">Export</span> ▾</button>
+    </div>
+    <button id="btnSettings" class="tb" title="Settings"><span class="i">⚙︎</span><span class="lbl">Settings</span></button>
+    <button id="btnNew" class="tb primary" title="New Racer"><span class="i">＋</span><span class="lbl">New Racer</span></button>
+  </header>
+  <div class="split" id="split">
+    <aside class="sidebar">
+      <div class="filters">
+        <input id="search" class="field search" type="search" placeholder="Name or car #" autocomplete="off">
+        <select id="groupFilter" class="field"></select>
+        <select id="statusFilter" class="field">
+          <option value="all">All</option>
+          <option value="waiting">Not Checked In</option>
+          <option value="checkedIn">Checked In</option>
+          <option value="needsInspection">Needs Inspection</option>
+        </select>
+      </div>
+      <ul id="list" class="list" role="listbox" aria-label="Racers"></ul>
+      <div id="count" class="count"></div>
+    </aside>
+    <main id="detail" class="detail"></main>
+  </div>
+  <div id="layer"></div>
+  <script src="app.js"></script>
+</body>
+</html>

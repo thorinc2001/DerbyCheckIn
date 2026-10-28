@@ -1,0 +1,4 @@
+# Build output (recreated by swift build and ./build.sh)
+.build/
+build/
+.DS_Store
