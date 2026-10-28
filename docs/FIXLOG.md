@@ -17,3 +17,15 @@ where it compared against `null`, and no choice was selected. Found while checki
 radio buttons on screen. The page now treats a missing result as Not inspected.
 
 Rule: in the browser, read an optional the server may omit with `?? null` before comparing.
+
+## 2026-10-28: Undo tests crashed now and then
+
+The Undo tests ended each simulated click by spinning the main run loop so the undo manager
+would close that step's group. With nothing scheduled, the run loop can return without a pass,
+so two steps sometimes merged; undoing then removed the whole racer and the next line read a
+racer that wasn't there. The app itself was fine: every real event closes its group. Each test
+step now schedules a tiny timer so the pass always happens, checks the group closed, and reads
+racers with `#require` so a missing one fails the test instead of crashing the run.
+
+Rule: to end an undo group in a test with groupsByEvent, run one real run-loop pass (schedule a
+timer first); never call endUndoGrouping on the automatic group.

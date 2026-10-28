@@ -181,8 +181,10 @@ struct StorageTests {
 @MainActor
 @Suite("Undo")
 struct UndoTests {
-    /// A store with an undo manager that groups by event, as the app's window does: each
-    /// `step` is one click or key press, after which the run loop closes the undo group.
+    /// A store with an undo manager that groups by event, as the app's window does. Each `step`
+    /// is one click or key press, after which one pass of the run loop closes the undo group,
+    /// as in the app. A run loop with nothing scheduled can return without a pass, so `step`
+    /// schedules a tiny timer first.
     func makeStore() -> (Store, UndoManager) {
         let store = Store(folder: tempFolder())
         let undo = UndoManager()
@@ -192,7 +194,10 @@ struct UndoTests {
 
     func step(_ undo: UndoManager, _ action: () -> Void) {
         action()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        let tick = Timer(timeInterval: 0.005, repeats: false) { _ in }
+        RunLoop.main.add(tick, forMode: .default)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        #expect(undo.groupingLevel == 0, "the run loop closed this step's undo group")
     }
 
     @Test func undoAndRedoADeletedRacerWithPhotos() throws {
@@ -200,13 +205,13 @@ struct UndoTests {
         step(undo) { store.addRacer(rank: "CS_3_Bears") }
         let id = try #require(store.selection)
         step(undo) { store.setPhoto(orange, kind: .car, racerID: id) }
-        let photo = try #require(store.data.racers[0].carPhoto)
+        let photo = try #require(store.data.racers.first?.carPhoto)
         step(undo) { store.deleteRacer(id) }
         #expect(undo.undoActionName == "Delete Racer")
 
         undo.undo()
         #expect(store.data.racers.map(\.id) == [id])
-        #expect(store.data.racers[0].carPhoto == photo)
+        #expect(store.data.racers.first?.carPhoto == photo)
         #expect(FileManager.default.fileExists(atPath: store.photoURL(photo).path))
 
         undo.redo()
@@ -220,9 +225,9 @@ struct UndoTests {
         for name in ["R", "Ro", "Rob", "Robin"] {
             step(undo) { store.binding(id).wrappedValue.firstName = name }
         }
-        #expect(store.data.racers[0].firstName == "Robin")
+        #expect(store.data.racers.first?.firstName == "Robin")
         undo.undo()
-        #expect(store.data.racers[0].firstName == "")
+        #expect(store.data.racers.first?.firstName == "")
         undo.undo()
         #expect(store.data.racers.isEmpty, "the next step back is adding the racer")
     }
@@ -235,8 +240,8 @@ struct UndoTests {
         step(undo) { store.undoable("Check In Sam") { store.binding(id).wrappedValue.checkedInAt = Date() } }
         #expect(undo.undoActionName == "Check In Sam")
         undo.undo()
-        #expect(store.data.racers[0].checkedInAt == nil)
-        #expect(store.data.racers[0].firstName == "Sam", "undoing the check-in keeps the name")
+        #expect(try #require(store.data.racers.first).checkedInAt == nil)
+        #expect(store.data.racers.first?.firstName == "Sam", "undoing the check-in keeps the name")
     }
 
     @Test func undoClearsASelectionThatNoLongerExists() throws {
