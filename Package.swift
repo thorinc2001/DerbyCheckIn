@@ -15,6 +15,6 @@ let package = Package(
         .executableTarget(name: "DerbyWebCheckIn", dependencies: ["DerbyCore", "DerbyKit"], exclude: ["Web"]),
         .testTarget(name: "DerbyCoreTests", dependencies: ["DerbyCore"]),
         .testTarget(name: "DerbyKitTests", dependencies: ["DerbyCore", "DerbyKit"]),
-        .testTarget(name: "DerbyCheckInTests", dependencies: ["DerbyCheckIn"]),
+        .testTarget(name: "DerbyCheckInTests", dependencies: ["DerbyCheckIn", "DerbyKit", "DerbyCore"]),
     ]
 )

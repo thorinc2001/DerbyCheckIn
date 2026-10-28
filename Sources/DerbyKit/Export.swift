@@ -70,6 +70,6 @@ extension Store {
             message = "That file could not be read."
             return
         }
-        message = data.importRoster(text: text)
+        undoable("Import Roster") { message = data.importRoster(text: text) }
     }
 }

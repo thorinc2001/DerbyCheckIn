@@ -26,7 +26,6 @@ public struct SettingsView: View {
                 .tabItem { Label("Storage", systemImage: "externaldrive.badge.icloud") }
                 .tag(SettingsTab.storage.rawValue)
         }
-        .frame(width: 760, height: 560)
         .alert("Derby Check-In", isPresented: Binding(get: { store.settingsMessage != nil }, set: { if !$0 { store.settingsMessage = nil } })) {
             Button("OK") { store.settingsMessage = nil }
         } message: {
@@ -67,6 +66,8 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .fitsContent(fallback: 300)
+        .frame(width: 520)
     }
 }
 
@@ -181,6 +182,8 @@ struct StorageSettings: View {
             }
         }
         .formStyle(.grouped)
+        .fitsContent(fallback: 460)
+        .frame(width: 600)
         .onAppear(perform: refresh)
         .confirmationDialog(
             "That folder already has an event",

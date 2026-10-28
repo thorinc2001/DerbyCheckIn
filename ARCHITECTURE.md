@@ -74,3 +74,21 @@ Tools/check-all.sh ~/Desktop/Rosters.csv # the same with a real roster, plus its
 
 `./build.sh` builds both apps into `build/` and copies `Sources/DerbyWebCheckIn/Web` into the
 web app's bundle. `Tools/make-icon.swift` draws both icons (`--web` adds the Wi-Fi symbol).
+
+## Undo
+
+The Mac app's main window gives its undo manager to `Store`. Every change to `data` registers
+an undo step that restores the previous event (and a redo step on the way back). Changes less
+than a second apart join one step, so typing a name is one step; `Store.undoable(_:_:)` makes
+an action its own named step ("Undo Check In Robin Avery"). Photo files are never deleted when
+a racer or photo is removed, so Undo can bring them back; files unused for a day are cleared
+at the next launch. The web app has no undo manager, so nothing is recorded there.
+
+## Snapshots
+
+```bash
+DERBY_SNAPSHOTS=/tmp/derby-shots swift test --filter SnapshotTests
+```
+
+draws the racer form and each Settings tab, light and dark, to PNG files using the sample
+roster, without the screen or any permission.

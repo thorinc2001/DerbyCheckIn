@@ -327,8 +327,12 @@ function racerForm(r) {
     h('input', { type: 'checkbox', class: 'switch', checked: r.inspection[field], 'data-key': k(field),
       onchange: (x) => patchRacer(id, { inspection: { [field]: x.target.checked } }) }));
 
-  const result = h('div', { class: 'segmented' }, [[null, 'Not inspected'], [true, 'Passed'], [false, 'Failed']].map(([v, label]) =>
-    h('button', { class: r.inspection.passed === v ? 'on' : '', onclick: () => patchRacer(id, { inspection: { passed: v } }) }, label)));
+  const result = h('div', { class: 'radios', role: 'radiogroup', 'aria-label': 'Result' },
+    [[null, 'Not inspected'], [true, 'Passed'], [false, 'Failed']].map(([v, label]) =>
+      h('label', null,
+        h('input', { type: 'radio', name: `result-${id}`, checked: (r.inspection.passed ?? null) === v, 'data-key': k(`result-${v}`),
+          onchange: () => patchRacer(id, { inspection: { passed: v } }) }),
+        label)));
 
   const photoSlot = (kind, title, icon) => {
     const file = kind === 'racer' ? r.racerPhoto : r.carPhoto;

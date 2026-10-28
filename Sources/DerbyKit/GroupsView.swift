@@ -25,12 +25,13 @@ struct GroupsView: View {
                 ForEach(store.data.groups) { group in
                     GroupRow(group: group) { renumberGroup = group.id }
                 }
-                .onMove { store.data.groups.move(fromOffsets: $0, toOffset: $1) }
+                .onMove { from, to in store.undoable("Move Group") { store.data.groups.move(fromOffsets: from, toOffset: to) } }
             }
+            .fitsContent(max: 460, fallback: 420)
 
             Divider()
             HStack {
-                Button("Add Group", systemImage: "plus") { store.data.addGroup() }
+                Button("Add Group", systemImage: "plus") { store.undoable("Add Group") { store.data.addGroup() } }
                 Spacer()
                 Text("Press Return to save a change. Drag rows to reorder. Next Available fills each group's numbers from its start.")
                     .font(.caption)
@@ -39,14 +40,16 @@ struct GroupsView: View {
             }
             .padding(12)
         }
-        .frame(minWidth: 680, minHeight: 400)
+        .frame(width: 720)
         .confirmationDialog(
             "Renumber every car in \(renumberTarget?.name ?? "this group")?",
             isPresented: Binding(get: { renumberGroup != nil }, set: { if !$0 { renumberGroup = nil } }),
             presenting: renumberTarget
         ) { group in
             Button("Renumber \(store.data.carCount(rank: group.rank)) Cars") {
-                store.settingsMessage = store.data.renumber(group.id, onlyUnnumbered: false)
+                store.undoable("Renumber \(group.name)") {
+                    store.settingsMessage = store.data.renumber(group.id, onlyUnnumbered: false)
+                }
             }
         } message: { group in
             Text("Cars get new numbers from \(group.startNumber) up, in last-name order. Any car already labelled will need a new number label.")
@@ -73,12 +76,12 @@ struct GroupRow: View {
         let canNumber = group.startNumber > 0 && count > 0
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 12) {
-                TextField("Rank", value: Binding(get: { group.rank }, set: { store.settingsMessage = store.data.renameRank(group.id, to: $0) }),
+                TextField("Rank", value: Binding(get: { group.rank }, set: { rank in store.undoable("Rename Group") { store.settingsMessage = store.data.renameRank(group.id, to: rank) } }),
                           format: PlainText())
                     .frame(width: Self.rankWidth)
-                TextField("Subgroup", value: Binding(get: { group.subgroup }, set: { store.data.renameSubgroup(group.id, to: $0) }),
+                TextField("Subgroup", value: Binding(get: { group.subgroup }, set: { name in store.undoable("Rename Group") { store.data.renameSubgroup(group.id, to: name) } }),
                           format: PlainText())
-                TextField("Start", value: Binding(get: { group.startNumber }, set: { store.data.setStartNumber(group.id, to: $0) }),
+                TextField("Start", value: Binding(get: { group.startNumber }, set: { start in store.undoable("Change Start Number") { store.data.setStartNumber(group.id, to: start) } }),
                           format: .number.grouping(.never))
                     .frame(width: Self.startWidth)
                 Text("\(count)")
@@ -86,12 +89,16 @@ struct GroupRow: View {
                     .foregroundStyle(.secondary)
                     .frame(width: Self.countWidth, alignment: .trailing)
                 Menu {
-                    Button("Number Cars Without a Number") { store.settingsMessage = store.data.renumber(group.id, onlyUnnumbered: true) }
+                    Button("Number Cars Without a Number") {
+                        store.undoable("Number \(group.name)") { store.settingsMessage = store.data.renumber(group.id, onlyUnnumbered: true) }
+                    }
                         .disabled(!canNumber)
                     Button("Renumber All Cars from \(group.startNumber)…", action: onRenumberAll)
                         .disabled(!canNumber)
                     Divider()
-                    Button("Delete Group", role: .destructive) { store.settingsMessage = store.data.deleteGroup(group.id) }
+                    Button("Delete Group", role: .destructive) {
+                        store.undoable("Delete Group") { store.settingsMessage = store.data.deleteGroup(group.id) }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }

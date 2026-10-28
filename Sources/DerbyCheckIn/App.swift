@@ -38,6 +38,7 @@ struct DerbyCheckInApp: App {
             SettingsView()
                 .environmentObject(store)
         }
+        .windowResizability(.contentSize)
     }
 }
 
@@ -52,6 +53,7 @@ enum StatusFilter: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @EnvironmentObject var store: Store
+    @Environment(\.undoManager) private var undoManager
     @State private var search = ""
     @State private var groupFilter = ""
     @State private var status = StatusFilter.all
@@ -117,6 +119,9 @@ struct ContentView: View {
             }
         }
         .navigationTitle(store.data.eventName)
+        // Every change to the event goes on this window's Undo stack (Edit › Undo, ⌘Z).
+        .onAppear { store.undoManager = undoManager }
+        .onChange(of: undoManager) { _, manager in store.undoManager = manager }
         .toolbar {
             ToolbarItemGroup {
                 OpenGroupsButton()

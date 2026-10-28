@@ -30,7 +30,9 @@ struct RacerDetailView: View {
                         TextField("Car number", value: $racer.carNumber, format: .number.grouping(.never))
                             .labelsHidden()
                             .frame(width: 100)
-                        Button("Next Available") { racer.carNumber = store.data.nextCarNumber(for: racer) }
+                        Button("Next Available") {
+                            store.undoable("Next Available Number") { racer.carNumber = store.data.nextCarNumber(for: racer) }
+                        }
                             .disabled(racer.rank.isEmpty)
                             .help("Next free number in this group's series")
                     }
@@ -61,6 +63,7 @@ struct RacerDetailView: View {
                     }
                 }
                 Toggle("Exclude from racing", isOn: $racer.exclude)
+                    .controlSize(.mini)
             } header: {
                 HStack {
                     Text("Car")
@@ -74,16 +77,25 @@ struct RacerDetailView: View {
 
             Section("Inspection") {
                 Toggle("Weight is \(maxWeight) oz or less", isOn: $racer.inspection.weightOK)
+                    .controlSize(.mini)
                 Toggle("Length, width and height within limits", isOn: $racer.inspection.dimensionsOK)
+                    .controlSize(.mini)
                 Toggle("Ground clearance OK", isOn: $racer.inspection.clearanceOK)
+                    .controlSize(.mini)
                 Toggle("Wheels and axles meet the rules", isOn: $racer.inspection.wheelsAxlesOK)
+                    .controlSize(.mini)
                 Toggle("No loose parts, liquids or springs", isOn: $racer.inspection.noLooseParts)
-                Picker("Result", selection: $racer.inspection.passed) {
-                    Text("Not inspected").tag(Bool?.none)
-                    Text("Passed").tag(Bool?.some(true))
-                    Text("Failed").tag(Bool?.some(false))
+                    .controlSize(.mini)
+                LabeledContent("Result") {
+                    Picker("Result", selection: $racer.inspection.passed) {
+                        Text("Not inspected").tag(Bool?.none)
+                        Text("Passed").tag(Bool?.some(true))
+                        Text("Failed").tag(Bool?.some(false))
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.radioGroup)
+                    .horizontalRadioGroupLayout()
                 }
-                .pickerStyle(.segmented)
             }
 
             Section("Photos") {
@@ -137,7 +149,9 @@ struct RacerDetailView: View {
                     .foregroundStyle(.green)
                     .font(.headline)
                 Spacer()
-                Button("Undo Check-In") { racer.checkedInAt = nil }
+                Button("Undo Check-In") {
+                    store.undoable("Undo Check-In") { racer.checkedInAt = nil }
+                }
             }
         } else {
             let blocker = store.data.checkInBlocker(racer)
@@ -153,7 +167,9 @@ struct RacerDetailView: View {
                     }
                 }
                 Spacer()
-                Button("Check In") { racer.checkedInAt = Date() }
+                Button("Check In") {
+                    store.undoable("Check In \(racer.fullName)") { racer.checkedInAt = Date() }
+                }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .disabled(blocker != nil)

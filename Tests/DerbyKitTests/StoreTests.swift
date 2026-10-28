@@ -58,16 +58,18 @@ struct StoreTests {
         #expect(files.contains { $0.hasPrefix("event-unreadable-") })
     }
 
-    @Test func photosAreSavedReplacedAndRemoved() throws {
+    @Test func photosAreSavedAndReplaced() throws {
         let store = Store(folder: tempFolder())
         store.addRacer()
         let id = try #require(store.selection)
         store.setPhoto(orange, kind: .car, racerID: id)
         let first = try #require(store.data.racers[0].carPhoto)
         #expect(FileManager.default.fileExists(atPath: store.photoURL(first).path))
+        store.setPhoto(orange, kind: .car, racerID: id)
+        #expect(store.data.racers[0].carPhoto != first, "a new file name each time")
         store.setPhoto(nil, kind: .car, racerID: id)
         #expect(store.data.racers[0].carPhoto == nil)
-        #expect(!FileManager.default.fileExists(atPath: store.photoURL(first).path))
+        #expect(FileManager.default.fileExists(atPath: store.photoURL(first).path), "kept so Undo can put it back")
     }
 
     @Test func exportWritesTheRosterAndPhotos() throws {
@@ -83,15 +85,35 @@ struct StoreTests {
         #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent("Car Photos/405.jpg").path))
     }
 
-    @Test func deletingARacerRemovesTheirPhotos() throws {
+    @Test func deletingARacerClearsTheSelection() throws {
         let store = Store(folder: tempFolder())
         store.addRacer()
         let id = try #require(store.selection)
-        store.setPhoto(orange, kind: .racer, racerID: id)
-        let file = try #require(store.data.racers[0].racerPhoto)
         store.deleteRacer(id)
         #expect(store.data.racers.isEmpty && store.selection == nil)
-        #expect(!FileManager.default.fileExists(atPath: store.photoURL(file).path))
+    }
+
+    @Test func unusedPhotosAreRemovedAtLaunchOnlyWhenADayOld() throws {
+        let folder = tempFolder()
+        let store = Store(folder: folder)
+        store.addRacer()
+        let id = try #require(store.selection)
+        store.setPhoto(orange, kind: .car, racerID: id)
+        let used = try #require(store.data.racers[0].carPhoto)
+        store.setPhoto(orange, kind: .racer, racerID: id)
+        store.setPhoto(nil, kind: .racer, racerID: id)
+        store.save()
+        let fm = FileManager.default
+        let photos = try fm.contentsOfDirectory(atPath: store.photosFolder.path)
+        let unused = try #require(photos.first { $0 != used })
+        _ = Store(folder: folder)
+        #expect(fm.fileExists(atPath: store.photoURL(unused).path), "too new: it may belong to an event still syncing")
+
+        let twoDaysAgo = Date().addingTimeInterval(-2 * 24 * 60 * 60)
+        for name in photos { try fm.setAttributes([.modificationDate: twoDaysAgo], ofItemAtPath: store.photoURL(name).path) }
+        _ = Store(folder: folder)
+        #expect(!fm.fileExists(atPath: store.photoURL(unused).path))
+        #expect(fm.fileExists(atPath: store.photoURL(used).path), "photos a racer uses are kept")
     }
 }
 
@@ -153,5 +175,101 @@ struct StorageTests {
         let store = Store(folder: tempFolder())
         store.useDataFolder(tempFolder("elsewhere"), bringCurrentEvent: true)
         #expect(UserDefaults.standard.string(forKey: "dataFolder") == before)
+    }
+}
+
+@MainActor
+@Suite("Undo")
+struct UndoTests {
+    /// A store with an undo manager that groups by event, as the app's window does: each
+    /// `step` is one click or key press, after which the run loop closes the undo group.
+    func makeStore() -> (Store, UndoManager) {
+        let store = Store(folder: tempFolder())
+        let undo = UndoManager()
+        store.undoManager = undo
+        return (store, undo)
+    }
+
+    func step(_ undo: UndoManager, _ action: () -> Void) {
+        action()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+    }
+
+    @Test func undoAndRedoADeletedRacerWithPhotos() throws {
+        let (store, undo) = makeStore()
+        step(undo) { store.addRacer(rank: "CS_3_Bears") }
+        let id = try #require(store.selection)
+        step(undo) { store.setPhoto(orange, kind: .car, racerID: id) }
+        let photo = try #require(store.data.racers[0].carPhoto)
+        step(undo) { store.deleteRacer(id) }
+        #expect(undo.undoActionName == "Delete Racer")
+
+        undo.undo()
+        #expect(store.data.racers.map(\.id) == [id])
+        #expect(store.data.racers[0].carPhoto == photo)
+        #expect(FileManager.default.fileExists(atPath: store.photoURL(photo).path))
+
+        undo.redo()
+        #expect(store.data.racers.isEmpty)
+    }
+
+    @Test func typingIsOneUndoStep() throws {
+        let (store, undo) = makeStore()
+        step(undo) { store.addRacer() }
+        let id = try #require(store.selection)
+        for name in ["R", "Ro", "Rob", "Robin"] {
+            step(undo) { store.binding(id).wrappedValue.firstName = name }
+        }
+        #expect(store.data.racers[0].firstName == "Robin")
+        undo.undo()
+        #expect(store.data.racers[0].firstName == "")
+        undo.undo()
+        #expect(store.data.racers.isEmpty, "the next step back is adding the racer")
+    }
+
+    @Test func checkInIsItsOwnStepAfterTyping() throws {
+        let (store, undo) = makeStore()
+        step(undo) { store.addRacer(rank: "Outlaw") }
+        let id = try #require(store.selection)
+        step(undo) { store.binding(id).wrappedValue.firstName = "Sam" }
+        step(undo) { store.undoable("Check In Sam") { store.binding(id).wrappedValue.checkedInAt = Date() } }
+        #expect(undo.undoActionName == "Check In Sam")
+        undo.undo()
+        #expect(store.data.racers[0].checkedInAt == nil)
+        #expect(store.data.racers[0].firstName == "Sam", "undoing the check-in keeps the name")
+    }
+
+    @Test func undoClearsASelectionThatNoLongerExists() throws {
+        let (store, undo) = makeStore()
+        step(undo) { store.addRacer() }
+        #expect(store.selection != nil)
+        undo.undo()
+        #expect(store.selection == nil)
+    }
+
+    @Test func undoIsSaved() throws {
+        let folder = tempFolder()
+        let store = Store(folder: folder)
+        let undo = UndoManager()
+        store.undoManager = undo
+        step(undo) { store.addRacer() }
+        undo.undo()
+        store.save()
+        #expect(Store.event(in: folder)?.racers.isEmpty == true)
+    }
+
+    @Test func groupActionsCanBeUndone() throws {
+        let (store, undo) = makeStore()
+        let bears = try #require(store.data.groups.first { $0.rank == "CS_3_Bears" })
+        step(undo) { store.undoable("Rename Group") { store.settingsMessage = store.data.renameRank(bears.id, to: "CS_3_Bear_Cubs") } }
+        #expect(store.data.groups.contains { $0.rank == "CS_3_Bear_Cubs" })
+        undo.undo()
+        #expect(store.data.groups.contains { $0.rank == "CS_3_Bears" })
+    }
+
+    @Test func withoutAnUndoManagerNothingIsRecorded() {
+        let store = Store(folder: tempFolder())
+        store.addRacer()
+        #expect(store.data.racers.count == 1, "the web app has no undo manager and still works")
     }
 }

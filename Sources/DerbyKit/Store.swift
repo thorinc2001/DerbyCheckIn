@@ -6,7 +6,13 @@ import SwiftUI
 /// ~/Documents/Derby Check-In unless moved (for example to OneDrive or Google Drive) in Settings.
 @MainActor
 public final class Store: ObservableObject {
-    @Published public var data = EventData() { didSet { if !isLoading { scheduleSave() } } }
+    @Published public var data = EventData() {
+        didSet {
+            guard !isLoading else { return }
+            recordUndo(from: oldValue)
+            scheduleSave()
+        }
+    }
     @Published public var selection: Racer.ID?
     /// Shown to the user as an alert.
     @Published public var message: String?
@@ -18,6 +24,11 @@ public final class Store: ObservableObject {
     private var dataFile: URL { folder.appendingPathComponent("event.json") }
     private var saveTask: Task<Void, Never>?
     private var isLoading = false
+    /// The window's undo manager, set by the app. Nil in the web app: browsers have no Undo.
+    public weak var undoManager: UndoManager?
+    /// Changes until this time join the current undo step, so typing a name is one step.
+    private var joinEditsUntil = Date.distantPast
+    private var isRestoring = false
     /// False for test stores given their own folder, so they never change the saved setting.
     private let remembersFolder: Bool
 
@@ -57,6 +68,7 @@ public final class Store: ObservableObject {
             var loaded = try Self.decoder.decode(EventData.self, from: raw)
             loaded.fillDefaultStartNumbers()
             data = loaded
+            removeUnusedPhotos()
         } catch {
             // Keep the unreadable file rather than overwriting it.
             let backup = folder.appendingPathComponent("event-unreadable-\(Int(Date().timeIntervalSince1970)).json")
@@ -169,20 +181,65 @@ public final class Store: ObservableObject {
     }
 
     public func addRacer(rank: String = "") {
-        selection = data.addRacer(rank: rank).id
+        undoable("New Racer") { selection = data.addRacer(rank: rank).id }
     }
 
     public func addCar(for racer: Racer) {
-        selection = data.addCar(for: racer).id
+        undoable("Add Car") { selection = data.addCar(for: racer).id }
     }
 
     public func deleteRacer(_ id: Racer.ID) {
         guard let racer = data.racers.first(where: { $0.id == id }) else { return }
-        for file in [racer.racerPhoto, racer.carPhoto].compactMap({ $0 }) {
-            try? FileManager.default.removeItem(at: photosFolder.appendingPathComponent(file))
+        // The photo files stay until the next launch, so Undo can bring the racer back whole.
+        undoable("Delete \(racer.fullName.isEmpty ? "Racer" : racer.fullName)") {
+            data.racers.removeAll { $0.id == id }
         }
-        data.racers.removeAll { $0.id == id }
         if selection == id { selection = nil }
+    }
+
+    // MARK: Undo
+
+    /// Makes `change` its own undo step, named for the Edit menu ("Undo Delete Robin Avery").
+    public func undoable(_ name: String, _ change: () -> Void) {
+        joinEditsUntil = .distantPast
+        change()
+        undoManager?.setActionName(name)
+        joinEditsUntil = .distantPast
+    }
+
+    /// Every change to the event can be undone. Edits close together (typing) join one step.
+    private func recordUndo(from old: EventData) {
+        guard let undoManager, !isRestoring else { return }
+        let now = Date()
+        defer { joinEditsUntil = now.addingTimeInterval(1) }
+        guard now >= joinEditsUntil else { return }
+        undoManager.registerUndo(withTarget: self) { $0.restore(old) }
+        undoManager.setActionName("Edit")
+    }
+
+    /// Puts back an earlier event, and registers the reverse so Redo works.
+    private func restore(_ snapshot: EventData) {
+        let current = data
+        undoManager?.registerUndo(withTarget: self) { $0.restore(current) }
+        isRestoring = true
+        data = snapshot
+        isRestoring = false
+        joinEditsUntil = .distantPast
+        if let id = selection, !data.racers.contains(where: { $0.id == id }) { selection = nil }
+    }
+
+    /// Deletes photo files no racer uses. Runs at launch, when there is no undo history to need
+    /// them, and only for files unused for a day, so a photo that synced to a shared folder
+    /// before its event did isn't removed.
+    private func removeUnusedPhotos() {
+        let fm = FileManager.default
+        let used = Set(data.racers.flatMap { [$0.racerPhoto, $0.carPhoto].compactMap { $0 } })
+        let dayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+        let files = (try? fm.contentsOfDirectory(at: photosFolder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        for file in files where !used.contains(file.lastPathComponent) && file.pathExtension == "jpg" {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantFuture
+            if modified < dayAgo { try? fm.removeItem(at: file) }
+        }
     }
 
     // MARK: Photos
@@ -193,15 +250,14 @@ public final class Store: ObservableObject {
 
     public func setPhoto(_ image: NSImage?, kind: PhotoKind, racerID: Racer.ID) {
         guard let i = data.racers.firstIndex(where: { $0.id == racerID }) else { return }
-        let old = kind == .racer ? data.racers[i].racerPhoto : data.racers[i].carPhoto
         var newName: String?
         if let image {
             guard let jpeg = image.jpegData() else {
                 message = "That image could not be read."
                 return
             }
-            // A new name each time so the view reloads the image.
-            let name = "\(racerID.uuidString)-\(kind.rawValue)-\(Int(Date().timeIntervalSince1970)).jpg"
+            // A new name each time, so the view reloads the image and Undo never finds it overwritten.
+            let name = "\(racerID.uuidString)-\(kind.rawValue)-\(UUID().uuidString.prefix(8)).jpg"
             do {
                 try jpeg.write(to: photoURL(name), options: .atomic)
                 newName = name
@@ -210,8 +266,10 @@ public final class Store: ObservableObject {
                 return
             }
         }
-        if let old { try? FileManager.default.removeItem(at: photoURL(old)) }
-        if kind == .racer { data.racers[i].racerPhoto = newName } else { data.racers[i].carPhoto = newName }
+        // The old file stays until the next launch, so Undo can put it back.
+        undoable(newName == nil ? "Remove Photo" : "Set Photo") {
+            if kind == .racer { data.racers[i].racerPhoto = newName } else { data.racers[i].carPhoto = newName }
+        }
     }
 
     public func choosePhotoFile(kind: PhotoKind, racerID: Racer.ID) {

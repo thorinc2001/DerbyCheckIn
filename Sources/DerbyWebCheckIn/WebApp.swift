@@ -51,6 +51,7 @@ struct DerbyWebCheckInApp: App {
             SettingsView()
                 .environmentObject(store)
         }
+        .windowResizability(.contentSize)
     }
 }
 
