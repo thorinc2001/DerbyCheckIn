@@ -4,7 +4,7 @@ import SwiftUI
 /// Edits the race groups: GPRM Rank, Subgroup name, and the first car number of each series.
 struct GroupsView: View {
     @EnvironmentObject var store: Store
-    @StateObject private var ui = GroupsState()
+    @State private var renumberGroup: RaceGroup.ID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +23,7 @@ struct GroupsView: View {
 
             List {
                 ForEach(store.data.groups) { group in
-                    GroupRow(group: group) { ui.renumberGroup = group.id }
+                    GroupRow(group: group) { renumberGroup = group.id }
                 }
                 .onMove { store.data.groups.move(fromOffsets: $0, toOffset: $1) }
             }
@@ -42,7 +42,7 @@ struct GroupsView: View {
         .frame(minWidth: 680, minHeight: 400)
         .confirmationDialog(
             "Renumber every car in \(renumberTarget?.name ?? "this group")?",
-            isPresented: Binding(get: { ui.renumberGroup != nil }, set: { if !$0 { ui.renumberGroup = nil } }),
+            isPresented: Binding(get: { renumberGroup != nil }, set: { if !$0 { renumberGroup = nil } }),
             presenting: renumberTarget
         ) { group in
             Button("Renumber \(store.data.carCount(rank: group.rank)) Cars") {
@@ -54,7 +54,7 @@ struct GroupsView: View {
     }
 
     private var renumberTarget: RaceGroup? {
-        store.data.groups.first { $0.id == ui.renumberGroup }
+        store.data.groups.first { $0.id == renumberGroup }
     }
 }
 
@@ -120,7 +120,3 @@ struct PlainText: ParseableFormatStyle, ParseStrategy {
     func parse(_ value: String) throws -> String { value.trimmingCharacters(in: .whitespaces) }
 }
 
-/// View-local state, kept in an ObservableObject while the app builds without the @State macro.
-final class GroupsState: ObservableObject {
-    @Published var renumberGroup: RaceGroup.ID?
-}

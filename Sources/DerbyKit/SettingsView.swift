@@ -122,16 +122,12 @@ public struct CloudFolder: Identifiable, Hashable {
     }
 }
 
-final class StorageState: ObservableObject {
-    @Published var clouds: [CloudFolder] = []
-    /// A chosen folder that already holds an event, waiting for the user to decide.
-    @Published var pending: URL?
-    @Published var pendingCount = 0
-}
 
 struct StorageSettings: View {
     @EnvironmentObject var store: Store
-    @StateObject private var ui = StorageState()
+    @State private var clouds: [CloudFolder] = []
+    @State private var pending: URL?
+    @State private var pendingCount = 0
 
     var body: some View {
         Form {
@@ -143,7 +139,7 @@ struct StorageSettings: View {
                         .lineLimit(3)
                 }
                 LabeledContent("Kind") {
-                    if let cloud = CloudFolder.service(of: store.folder, in: ui.clouds) {
+                    if let cloud = CloudFolder.service(of: store.folder, in: clouds) {
                         Label("\(cloud.name) – syncs to the cloud", systemImage: "icloud")
                     } else {
                         Label("This Mac only", systemImage: "desktopcomputer")
@@ -159,11 +155,11 @@ struct StorageSettings: View {
             }
 
             Section {
-                if ui.clouds.isEmpty {
+                if clouds.isEmpty {
                     Text("No OneDrive or Google Drive folder was found on this Mac. Install OneDrive or Google Drive for desktop, sign in, then click Look Again.")
                         .foregroundStyle(.secondary)
                 }
-                ForEach(ui.clouds) { cloud in
+                ForEach(clouds) { cloud in
                     HStack {
                         Label(cloud.name, systemImage: cloud.service == .oneDrive ? "cloud" : "externaldrive.badge.icloud")
                         Spacer()
@@ -188,27 +184,27 @@ struct StorageSettings: View {
         .onAppear(perform: refresh)
         .confirmationDialog(
             "That folder already has an event",
-            isPresented: Binding(get: { ui.pending != nil }, set: { if !$0 { ui.pending = nil } })
+            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })
         ) {
             Button("Open the Event in That Folder") {
-                if let url = ui.pending { store.useDataFolder(url, bringCurrentEvent: false) }
+                if let url = pending { store.useDataFolder(url, bringCurrentEvent: false) }
             }
             Button("Replace It with This Mac's Event", role: .destructive) {
-                if let url = ui.pending { store.useDataFolder(url, bringCurrentEvent: true) }
+                if let url = pending { store.useDataFolder(url, bringCurrentEvent: true) }
             }
         } message: {
-            Text("The event there has \(ui.pendingCount) cars; the one open now has \(store.data.racers.count). Open it to pick up where someone else left off, or replace it with the one open now.")
+            Text("The event there has \(pendingCount) cars; the one open now has \(store.data.racers.count). Open it to pick up where someone else left off, or replace it with the one open now.")
         }
     }
 
     private func refresh() {
-        ui.clouds = CloudFolder.detect()
+        clouds = CloudFolder.detect()
     }
 
     private func pick(_ url: URL) {
         if let existing = Store.event(in: url) {
-            ui.pendingCount = existing.racers.count
-            ui.pending = url
+            pendingCount = existing.racers.count
+            pending = url
         } else {
             store.useDataFolder(url, bringCurrentEvent: true)
         }
@@ -221,7 +217,7 @@ struct StorageSettings: View {
         panel.canCreateDirectories = true
         panel.prompt = "Use This Folder"
         panel.message = "Choose the folder to save the event and photos in. A shared OneDrive or Google Drive folder works well."
-        if let cloud = ui.clouds.first { panel.directoryURL = cloud.url }
+        if let cloud = clouds.first { panel.directoryURL = cloud.url }
         guard panel.runModal() == .OK, let url = panel.url else { return }
         pick(url)
     }

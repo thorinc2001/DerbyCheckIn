@@ -5,7 +5,8 @@ import SwiftUI
 struct RacerDetailView: View {
     @EnvironmentObject var store: Store
     @Binding var racer: Racer
-    @StateObject private var ui = DetailState()
+    @State private var cameraFor: PhotoKind?
+    @State private var confirmDelete = false
 
     private var maxWeight: String { store.data.maxWeightOz.formatted() }
 
@@ -88,11 +89,11 @@ struct RacerDetailView: View {
             Section("Photos") {
                 HStack(alignment: .top, spacing: 24) {
                     PhotoSlot(title: "Racer", icon: "person.crop.square", filename: racer.racerPhoto,
-                              onCamera: { ui.cameraFor = .racer },
+                              onCamera: { cameraFor = .racer },
                               onFile: { store.choosePhotoFile(kind: .racer, racerID: racer.id) },
                               onRemove: { store.setPhoto(nil, kind: .racer, racerID: racer.id) })
                     PhotoSlot(title: "Car", icon: "car.side", filename: racer.carPhoto,
-                              onCamera: { ui.cameraFor = .car },
+                              onCamera: { cameraFor = .car },
                               onFile: { store.choosePhotoFile(kind: .car, racerID: racer.id) },
                               onRemove: { store.setPhoto(nil, kind: .car, racerID: racer.id) })
                 }
@@ -111,18 +112,18 @@ struct RacerDetailView: View {
             }
 
             Section {
-                Button("Delete Racer…", role: .destructive) { ui.confirmDelete = true }
+                Button("Delete Racer…", role: .destructive) { confirmDelete = true }
             }
         }
         .formStyle(.grouped)
         .navigationTitle(racer.fullName.isEmpty ? "New Racer" : racer.fullName)
-        .sheet(item: $ui.cameraFor) { kind in
+        .sheet(item: $cameraFor) { kind in
             CameraSheet(title: kind == .racer ? "Racer Photo" : "Car Photo") { image in
                 store.setPhoto(image, kind: kind, racerID: racer.id)
             }
         }
         .confirmationDialog("Delete \(racer.fullName.isEmpty ? "this racer" : racer.fullName)?",
-                            isPresented: $ui.confirmDelete) {
+                            isPresented: $confirmDelete) {
             Button("Delete", role: .destructive) { store.deleteRacer(racer.id) }
         } message: {
             Text("Their details and photos will be removed.")

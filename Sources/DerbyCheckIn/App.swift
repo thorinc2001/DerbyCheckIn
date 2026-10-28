@@ -52,14 +52,16 @@ enum StatusFilter: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @EnvironmentObject var store: Store
-    @StateObject private var ui = ListState()
+    @State private var search = ""
+    @State private var groupFilter = ""
+    @State private var status = StatusFilter.all
 
     private var filtered: [Racer] {
-        let q = ui.search.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         return store.data.racers
-            .filter { ui.groupFilter.isEmpty || $0.rank == ui.groupFilter }
+            .filter { groupFilter.isEmpty || $0.rank == groupFilter }
             .filter {
-                switch ui.status {
+                switch status {
                 case .all: true
                 case .waiting: !$0.isCheckedIn
                 case .checkedIn: $0.isCheckedIn
@@ -75,14 +77,14 @@ struct ContentView: View {
             List(filtered, selection: $store.selection) { racer in
                 RacerRow(racer: racer).tag(racer.id)
             }
-            .searchable(text: $ui.search, placement: .sidebar, prompt: "Name or car #")
+            .searchable(text: $search, placement: .sidebar, prompt: "Name or car #")
             .safeAreaInset(edge: .top) {
                 VStack(spacing: 6) {
-                    Picker("Group", selection: $ui.groupFilter) {
+                    Picker("Group", selection: $groupFilter) {
                         Text("All groups").tag("")
                         ForEach(store.data.groups) { Text($0.name).tag($0.rank) }
                     }
-                    Picker("Show", selection: $ui.status) {
+                    Picker("Show", selection: $status) {
                         ForEach(StatusFilter.allCases) { Text($0.rawValue).tag($0) }
                     }
                 }
@@ -109,7 +111,7 @@ struct ContentView: View {
                 } description: {
                     Text("Pick a racer on the left, add a new one, or import a pre-registration roster.")
                 } actions: {
-                    Button("New Racer") { store.addRacer(rank: ui.groupFilter) }
+                    Button("New Racer") { store.addRacer(rank: groupFilter) }
                     Button("Import Roster…") { store.importRoster() }
                 }
             }
@@ -118,7 +120,7 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 OpenGroupsButton()
-                Button("New Racer", systemImage: "plus") { store.addRacer(rank: ui.groupFilter) }
+                Button("New Racer", systemImage: "plus") { store.addRacer(rank: groupFilter) }
                 Menu("Export", systemImage: "square.and.arrow.up") {
                     Button("Export Checked-In Racers for GPRM…") { store.export(checkedInOnly: true) }
                     Button("Export All Racers for GPRM…") { store.export(checkedInOnly: false) }
@@ -163,18 +165,4 @@ struct RacerRow: View {
         }
         .padding(.vertical, 2)
     }
-}
-
-
-// View-local state (see the note in Models.swift about @State).
-
-final class ListState: ObservableObject {
-    @Published var search = ""
-    @Published var groupFilter = ""
-    @Published var status = StatusFilter.all
-}
-
-final class DetailState: ObservableObject {
-    @Published var cameraFor: PhotoKind?
-    @Published var confirmDelete = false
 }
