@@ -111,7 +111,14 @@ public struct CloudFolder: Identifiable, Hashable {
 
     /// The service a data folder lives in, if any.
     public static func service(of folder: URL, in clouds: [CloudFolder]) -> CloudFolder? {
-        clouds.first { folder.standardizedFileURL.path.hasPrefix($0.url.standardizedFileURL.path) }
+        // Compare real locations (/var and /private/var are the same folder) and whole folder
+        // names, so OneDrive-Personal doesn't also match OneDrive-Personal-Old.
+        func path(_ url: URL) -> String {
+            let p = url.standardizedFileURL.path
+            return p.hasPrefix("/private/") ? String(p.dropFirst("/private".count)) : p
+        }
+        let target = path(folder) + "/"
+        return clouds.first { target.hasPrefix(path($0.url) + "/") }
     }
 }
 
