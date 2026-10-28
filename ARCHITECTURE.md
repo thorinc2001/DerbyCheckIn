@@ -73,7 +73,7 @@ Tools/check-all.sh ~/Desktop/Rosters.csv # the same with a real roster, plus its
 ## Build
 
 `./build.sh` builds both apps into `build/` and copies `Sources/DerbyWebCheckIn/Web` into the
-web app's bundle. `Tools/make-icon.swift` draws both icons (`--web` adds the Wi-Fi symbol).
+web app's bundle. `Tools/make-icon.swift` draws both icons: a clipboard with a checklist and a wooden car, on a green tile, or a blue tile with a Wi-Fi badge for the web app (`--web`).
 
 ## Undo
 
