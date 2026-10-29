@@ -1,9 +1,16 @@
 import AppKit
 import DerbyCore
 
+/// The race program an export folder is for.
+public enum ExportTarget: String, Sendable {
+    case gprm, derbyNet
+
+    public var name: String { self == .gprm ? "GPRM" : "DerbyNet" }
+}
+
 /// Import and export on the Mac: file panels and the export folder around the shared roster code.
 extension Store {
-    public func export(checkedInOnly: Bool) {
+    public func export(checkedInOnly: Bool, for target: ExportTarget = .gprm) {
         let racers = (checkedInOnly ? data.racers.filter(\.isCheckedIn) : data.racers).sorted(by: Racer.displayOrder)
         guard !racers.isEmpty else {
             message = checkedInOnly ? "No racers are checked in yet." : "There are no racers to export."
@@ -25,22 +32,33 @@ extension Store {
         guard panel.runModal() == .OK, let base = panel.url else { return }
 
         do {
-            let dir = try writeExport(racers, into: base)
+            let dir = try writeExport(racers, into: base, for: target)
             let photos = racers.filter { $0.racerPhoto != nil || $0.carPhoto != nil }.count
             message = "Exported \(racers.count) cars (\(photos) with photos) to “\(dir.lastPathComponent)”."
+                + (target == .derbyNet ? "\n\n“\(DerbyNet.instructionsFile)” in the folder has the steps for DerbyNet." : "")
             NSWorkspace.shared.activateFileViewerSelecting([dir])
         } catch {
             message = "Export failed: \(error.localizedDescription)"
         }
     }
 
-    /// Writes "GPRM Roster.csv" plus photos named by car number, and returns the new folder.
-    /// Images/<car#>.jpg is the racer photo (or the car photo if there is none) and is what
-    /// the ImageFile column points to; Car Photos/<car#>.jpg holds every car photo.
-    public func writeExport(_ racers: [Racer], into base: URL) throws -> URL {
+    /// Writes the export folder for `target` into `base` and returns it.
+    public func writeExport(_ racers: [Racer], into base: URL, for target: ExportTarget = .gprm) throws -> URL {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HHmm"
-        let dir = base.appendingPathComponent("\(data.eventName) Export \(formatter.string(from: Date()))", isDirectory: true)
+        let label = target == .gprm ? "Export" : "DerbyNet Export"
+        let dir = base.appendingPathComponent("\(data.eventName) \(label) \(formatter.string(from: Date()))", isDirectory: true)
+        switch target {
+        case .gprm: try writeGPRMExport(racers, into: dir)
+        case .derbyNet: try writeDerbyNetExport(racers, into: dir)
+        }
+        return dir
+    }
+
+    /// "GPRM Roster.csv" plus photos named by car number.
+    /// Images/<car#>.jpg is the racer photo (or the car photo if there is none) and is what
+    /// the ImageFile column points to; Car Photos/<car#>.jpg holds every car photo.
+    private func writeGPRMExport(_ racers: [Racer], into dir: URL) throws {
         let images = dir.appendingPathComponent("Images", isDirectory: true)
         let carPhotos = dir.appendingPathComponent("Car Photos", isDirectory: true)
         let fm = FileManager.default
@@ -58,7 +76,29 @@ extension Store {
                 try fm.copyItem(at: photoURL(f), to: carPhotos.appendingPathComponent("\(r.carNumber).jpg"))
             }
         }
-        return dir
+    }
+
+    /// "DerbyNet Roster.csv", the steps for DerbyNet, and Racer Photos and Car Photos named
+    /// "<car#> <name>.jpg" for assigning by hand.
+    private func writeDerbyNetExport(_ racers: [Racer], into dir: URL) throws {
+        let racerPhotos = dir.appendingPathComponent("Racer Photos", isDirectory: true)
+        let carPhotos = dir.appendingPathComponent("Car Photos", isDirectory: true)
+        let fm = FileManager.default
+        try fm.createDirectory(at: racerPhotos, withIntermediateDirectories: true)
+        try fm.createDirectory(at: carPhotos, withIntermediateDirectories: true)
+
+        try DerbyNet.rosterCSV(racers).write(to: dir.appendingPathComponent("DerbyNet Roster.csv"), atomically: true, encoding: .utf8)
+        try DerbyNet.instructions(racers).write(
+            to: dir.appendingPathComponent(DerbyNet.instructionsFile), atomically: true, encoding: .utf8)
+
+        for r in racers {
+            if let f = r.racerPhoto {
+                try fm.copyItem(at: photoURL(f), to: racerPhotos.appendingPathComponent(DerbyNet.photoName(r)))
+            }
+            if let f = r.carPhoto {
+                try fm.copyItem(at: photoURL(f), to: carPhotos.appendingPathComponent(DerbyNet.photoName(r)))
+            }
+        }
     }
 
     public func importRoster() {

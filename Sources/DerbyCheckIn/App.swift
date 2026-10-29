@@ -25,6 +25,9 @@ struct DerbyCheckInApp: App {
                     .keyboardShortcut("e")
                 Button("Export All Racers for GPRM…") { store.export(checkedInOnly: false) }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
+                Button("Export Checked-In Racers for DerbyNet…") { store.export(checkedInOnly: true, for: .derbyNet) }
+                    .keyboardShortcut("e", modifiers: [.command, .option])
+                Button("Export All Racers for DerbyNet…") { store.export(checkedInOnly: false, for: .derbyNet) }
                 Divider()
                 OpenGroupsButton()
                     .keyboardShortcut("g", modifiers: [.command, .shift])
@@ -129,6 +132,9 @@ struct ContentView: View {
                 Menu("Export", systemImage: "square.and.arrow.up") {
                     Button("Export Checked-In Racers for GPRM…") { store.export(checkedInOnly: true) }
                     Button("Export All Racers for GPRM…") { store.export(checkedInOnly: false) }
+                    Divider()
+                    Button("Export Checked-In Racers for DerbyNet…") { store.export(checkedInOnly: true, for: .derbyNet) }
+                    Button("Export All Racers for DerbyNet…") { store.export(checkedInOnly: false, for: .derbyNet) }
                 }
             }
         }

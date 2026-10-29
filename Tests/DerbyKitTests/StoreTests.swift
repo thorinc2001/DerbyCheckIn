@@ -85,6 +85,22 @@ struct StoreTests {
         #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent("Car Photos/405.jpg").path))
     }
 
+    @Test func derbyNetExportWritesTheRosterStepsAndNamedPhotos() throws {
+        let store = Store(folder: tempFolder())
+        _ = store.data.importRoster(text: "First Name,Last Name,Car#,Car Name,Rank,Subgroup\r\nAlex,Avery,405,Comet,CS_3_Bears,Bears\r\n")
+        let alex = try #require(store.data.racers.first)
+        store.setPhoto(orange, kind: .racer, racerID: alex.id)
+        store.setPhoto(orange, kind: .car, racerID: alex.id)
+        let dir = try store.writeExport(store.data.racers, into: tempFolder("export"), for: .derbyNet)
+        #expect(dir.lastPathComponent.contains("DerbyNet Export"))
+        let csv = try String(contentsOf: dir.appendingPathComponent("DerbyNet Roster.csv"), encoding: .utf8)
+        #expect(csv.contains("Alex,Avery,405,Comet,Bears,No\r\n"))
+        let fm = FileManager.default
+        #expect(fm.fileExists(atPath: dir.appendingPathComponent(DerbyNet.instructionsFile).path))
+        #expect(fm.fileExists(atPath: dir.appendingPathComponent("Racer Photos/405 Alex Avery.jpg").path))
+        #expect(fm.fileExists(atPath: dir.appendingPathComponent("Car Photos/405 Alex Avery.jpg").path))
+    }
+
     @Test func deletingARacerClearsTheSelection() throws {
         let store = Store(folder: tempFolder())
         store.addRacer()

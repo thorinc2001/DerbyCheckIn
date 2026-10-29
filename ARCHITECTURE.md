@@ -17,7 +17,7 @@ Dependencies only point right. DerbyCore knows nothing about SwiftUI or AppKit.
 
 | Target | Holds |
 | --- | --- |
-| `DerbyCore` | `Racer`, `RaceGroup`, `EventData`; every check-in rule (`Rules.swift`); GPRM roster import and export (`Roster.swift`). Foundation only. |
+| `DerbyCore` | `Racer`, `RaceGroup`, `EventData`; every check-in rule (`Rules.swift`); GPRM roster import and export, and the DerbyNet roster (`Roster.swift`). Foundation only. |
 | `DerbyKit` | `Store` (saving `event.json`, the data folder, photos, selection), the import and export panels, and the Settings window (General, Race Groups, Storage). |
 | `DerbyCheckIn` | The native window: racer list, racer form, camera. |
 | `DerbyWebCheckIn` | The host window, an HTTP server on Network.framework (`HTTPServer.swift`), the JSON API (`WebAPI.swift`) and the browser app (`Web/`). |

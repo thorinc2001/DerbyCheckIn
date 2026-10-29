@@ -40,9 +40,15 @@ struct HostView: View {
                     Button("Settings…") { openSettings() }
                     Spacer()
                     Button("Import Roster…") { store.importRoster() }
-                    Menu("Export for GPRM") {
-                        Button("Export Checked-In Racers…") { store.export(checkedInOnly: true) }
-                        Button("Export All Racers…") { store.export(checkedInOnly: false) }
+                    Menu("Export") {
+                        Section("GPRM") {
+                            Button("Export Checked-In Racers…") { store.export(checkedInOnly: true) }
+                            Button("Export All Racers…") { store.export(checkedInOnly: false) }
+                        }
+                        Section("DerbyNet") {
+                            Button("Export Checked-In Racers…") { store.export(checkedInOnly: true, for: .derbyNet) }
+                            Button("Export All Racers…") { store.export(checkedInOnly: false, for: .derbyNet) }
+                        }
                     }
                     .fixedSize()
                 }

@@ -27,6 +27,69 @@ public enum GPRM {
     }
 }
 
+/// Files for DerbyNet (github.com/jeffpiazza/derbynet), carried to its computer on a USB drive.
+/// Its Import Roster page doesn't read header names: each column is matched by dragging a label.
+public enum DerbyNet {
+    public static let headers = ["First Name", "Last Name", "Car Number", "Car Name", "Group", "Ineligible for Award"]
+
+    /// The roster for Set-Up › Import Roster, in UTF-8. Group is the Subgroup ("Bears"), DerbyNet's den name.
+    /// Inspection and photos can't go in a roster: the instructions cover them.
+    public static func rosterCSV(_ racers: [Racer]) -> String {
+        var lines = [headers.map(CSV.escape).joined(separator: ",")]
+        for r in racers {
+            let fields = [r.firstName, r.lastName, String(r.carNumber), r.carName, r.groupName, r.exclude ? "Yes" : "No"]
+            lines.append(fields.map(CSV.escape).joined(separator: ","))
+        }
+        return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// "412 Robin Avery.jpg": the car number to find the racer, then the name to check it.
+    /// Only the characters DerbyNet keeps in uploaded file names, so it shows the name unchanged.
+    public static func photoName(_ r: Racer) -> String {
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ")
+        let name = String(String.UnicodeScalarView(r.fullName.decomposedStringWithCanonicalMapping.unicodeScalars
+            .filter { allowed.contains($0) }))
+        return "\(r.carNumber) \(name)".trimmingCharacters(in: .whitespaces) + ".jpg"
+    }
+
+    public static let instructionsFile = "How to Import into DerbyNet.txt"
+
+    /// The steps at the DerbyNet computer, saved next to the roster.
+    public static func instructions(_ racers: [Racer]) -> String {
+        let checkIn = racers.allSatisfy(\.isCheckedIn)
+            ? """
+              Every racer in this export passed check-in. On the Race Check-In page, click Bulk,
+                 choose All, and click Bulk Check-In.
+              """
+            : """
+              This export includes racers who have not checked in. On the Race Check-In page,
+                 check in only the racers who passed.
+              """
+        return """
+            Importing into DerbyNet
+
+            1. Copy this folder to the DerbyNet computer, or to any computer that can open DerbyNet.
+               Log in to DerbyNet as the Race Coordinator.
+
+            2. Set-Up › Import Roster: choose "DerbyNet Roster.csv". If any names have accents,
+               set Encoding to UTF-8. Drag each label onto its column: First Name, Last Name,
+               Car Number, Car Name, the group label (Den, Group, …) onto Group, and
+               "Ineligible for Award?" onto Ineligible for Award. Click Import Roster and
+               approve the new groups.
+
+            3. \(checkIn)
+
+            4. Racer Photos: drag every file in "Racer Photos" onto the upload area. Each file is
+               named by car number and racer, so drag each photo onto its racer.
+               Car Photos: do the same with the "Car Photos" folder.
+
+            Weight, the inspection checklist and notes stay in Derby Check-In: DerbyNet has no
+            place for them.
+
+            """.replacingOccurrences(of: "\n", with: "\r\n")
+    }
+}
+
 public enum CSV {
     public static func escape(_ field: String) -> String {
         let flat = field.replacingOccurrences(of: "\r\n", with: " ").replacingOccurrences(of: "\n", with: " ")

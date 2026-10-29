@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:DerbyCheckIn}",
+            "name": "Debug DerbyWebCheckIn",
+            "target": "DerbyWebCheckIn",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug DerbyWebCheckIn"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:DerbyCheckIn}",
+            "name": "Release DerbyWebCheckIn",
+            "target": "DerbyWebCheckIn",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release DerbyWebCheckIn"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:DerbyCheckIn}",
+            "name": "Debug DerbyCheckIn",
+            "target": "DerbyCheckIn",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug DerbyCheckIn"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:DerbyCheckIn}",
+            "name": "Release DerbyCheckIn",
+            "target": "DerbyCheckIn",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release DerbyCheckIn"
+        }
+    ]
+}

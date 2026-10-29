@@ -10,6 +10,7 @@ Mac apps for checking in pinewood derby racers and feeding the roster to
 Both record each racer's name, race group (GPRM Rank and Subgroup), car number and name,
 weight, an inspection checklist, racer and car photos, and check-in time. They import a
 GPRM roster and export one GPRM can import: `GPRM Roster.csv` plus photos named by car number.
+They can also export a roster and photos for [DerbyNet](https://github.com/jeffpiazza/derbynet).
 
 ## Using it
 
@@ -18,6 +19,10 @@ GPRM roster and export one GPRM can import: `GPRM Roster.csv` plus photos named 
 2. At check-in: pick the racer, weigh and inspect the car, take photos, and click **Check In**.
 3. Choose **Export Checked-In Racers for GPRM…**, copy the folder to the GPRM PC, copy
    `Images` into GPRM's Images folder, and import `GPRM Roster.csv` into GPRM.
+
+   Racing with [DerbyNet](https://github.com/jeffpiazza/derbynet) instead? Choose
+   **Export Checked-In Racers for DerbyNet…** and follow `How to Import into DerbyNet.txt`
+   in the folder: import the roster, bulk check-in, then drag the photos onto their racers.
 
 Race groups and their car-number series are in **Settings › Race Groups**. The event can be
 saved to OneDrive, Google Drive or any folder in **Settings › Storage**.

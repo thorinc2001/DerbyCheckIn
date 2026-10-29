@@ -42,6 +42,9 @@ struct DerbyWebCheckInApp: App {
                     .keyboardShortcut("e")
                 Button("Export All Racers for GPRM…") { store.export(checkedInOnly: false) }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
+                Button("Export Checked-In Racers for DerbyNet…") { store.export(checkedInOnly: true, for: .derbyNet) }
+                    .keyboardShortcut("e", modifiers: [.command, .option])
+                Button("Export All Racers for DerbyNet…") { store.export(checkedInOnly: false, for: .derbyNet) }
                 Divider()
                 Button("Show Data Folder in Finder") { store.showDataFolder() }
             }

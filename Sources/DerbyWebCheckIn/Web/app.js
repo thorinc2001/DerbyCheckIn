@@ -534,10 +534,11 @@ function importRoster() {
   input.click();
 }
 
-async function exportFor(checkedInOnly) {
-  const res = await api('GET', 'export' + (checkedInOnly ? '?checkedInOnly=1' : '')).catch(() => null);
+// target is 'gprm' or 'derbyNet'.
+async function exportFor(checkedInOnly, target) {
+  const res = await api('GET', 'export?for=' + target + (checkedInOnly ? '&checkedInOnly=1' : '')).catch(() => null);
   if (!res) return;
-  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'GPRM Export.zip';
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'Export.zip';
   const url = URL.createObjectURL(await res.blob());
   const a = h('a', { href: url, download: name });
   document.body.append(a);
@@ -671,8 +672,11 @@ function setup() {
   $('#btnExport').addEventListener('click', (x) => {
     x.stopPropagation();
     popMenu(x.currentTarget, [
-      { label: 'Export Checked-In Racers for GPRM…', run: () => exportFor(true) },
-      { label: 'Export All Racers for GPRM…', run: () => exportFor(false) },
+      { label: 'Export Checked-In Racers for GPRM…', run: () => exportFor(true, 'gprm') },
+      { label: 'Export All Racers for GPRM…', run: () => exportFor(false, 'gprm') },
+      '-',
+      { label: 'Export Checked-In Racers for DerbyNet…', run: () => exportFor(true, 'derbyNet') },
+      { label: 'Export All Racers for DerbyNet…', run: () => exportFor(false, 'derbyNet') },
     ]);
   });
   document.addEventListener('keydown', (e) => {

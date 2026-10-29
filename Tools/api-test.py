@@ -157,6 +157,16 @@ check("only the checked-in car is exported", len([l for l in lines[1:] if l]) ==
 check("ImageFile points at the GPRM PC folder", lines[1].endswith(rf"GrandPrix Race Manager\Images\{bear1}.jpg"))
 check("zip has the photo", any(n.endswith(f"Images/{bear1}.jpg") for n in names))
 
+s, body, h = call("GET", "/api/export?for=derbyNet&checkedInOnly=1")
+check("DerbyNet export is a zip download", s == 200 and "DerbyNet Export" in h.get("Content-Disposition", ""))
+z = zipfile.ZipFile(io.BytesIO(body))
+names = z.namelist()
+lines = z.read(next(n for n in names if n.endswith("DerbyNet Roster.csv"))).decode().split("\r\n")
+check("DerbyNet CSV has its header", lines[0] == "First Name,Last Name,Car Number,Car Name,Group,Ineligible for Award")
+check("DerbyNet CSV has the checked-in car in its subgroup", lines[1] == f"Pat,Tester,{bear1},Zoom,Bears,No")
+check("DerbyNet zip has the steps and the named photo",
+      any(n.endswith("How to Import into DerbyNet.txt") for n in names) and any(f"Photos/{bear1} Pat Tester.jpg" in n for n in names))
+
 s, body, _ = call("GET", "/api/export")
 check("full export blocked by the duplicate car number problem? (none expected)", s == 200)
 

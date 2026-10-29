@@ -102,3 +102,32 @@ struct RosterTests {
         #expect(exported.components(separatedBy: "\r\n").filter { !$0.isEmpty }.count == originalRows)
     }
 }
+
+@Suite("DerbyNet rosters")
+struct DerbyNetRosterTests {
+    @Test func rosterHasOneRowPerCarWithTheSubgroupAsGroup() {
+        let csv = DerbyNet.rosterCSV(importedSample().racers)
+        let rows = CSV.parse(csv)
+        #expect(rows[0] == DerbyNet.headers)
+        #expect(rows.count == 11)
+        #expect(rows.contains(["Alex", "Avery", "405", "Comet", "Bears", "No"]))
+        #expect(rows.contains(["Drew", "Diaz", "400", "Bear One", "Bears", "Yes"]), "Exclude becomes Ineligible for Award")
+        #expect(rows.contains(["Blair", "Brooks", "1003", "Fast, Furious", "GS_4th_1422", "No"]))
+        #expect(csv.contains(#""Say ""Hi""""#))
+    }
+
+    @Test func photoNamesKeepOnlyWhatDerbyNetKeeps() {
+        var r = Racer()
+        r.carNumber = 412
+        r.firstName = "José"
+        r.lastName = "O'Neil-Ruiz"
+        #expect(DerbyNet.photoName(r) == "412 Jose ONeil-Ruiz.jpg")
+    }
+
+    @Test func instructionsSayBulkCheckInOnlyWhenEveryoneCheckedIn() {
+        var r = Racer()
+        #expect(!DerbyNet.instructions([r]).contains("Bulk Check-In"))
+        r.checkedInAt = Date()
+        #expect(DerbyNet.instructions([r]).contains("Bulk Check-In"))
+    }
+}

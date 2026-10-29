@@ -140,7 +140,8 @@ final class WebAPI {
             let summary = store.data.importRoster(text: text)
             return state(message: summary)
         case ("GET", "export", 1):
-            return export(checkedInOnly: request.query["checkedInOnly"] == "1")
+            return export(checkedInOnly: request.query["checkedInOnly"] == "1",
+                          for: ExportTarget(rawValue: request.query["for"] ?? "") ?? .gprm)
 
         default:
             return .error("Not found", status: 404)
@@ -215,7 +216,7 @@ final class WebAPI {
         return try Self.decoder.decode(T.self, from: JSONSerialization.data(withJSONObject: object))
     }
 
-    private func export(checkedInOnly: Bool) -> HTTPResponse {
+    private func export(checkedInOnly: Bool, for target: ExportTarget) -> HTTPResponse {
         let racers = (checkedInOnly ? store.data.racers.filter(\.isCheckedIn) : store.data.racers)
         guard !racers.isEmpty else {
             return .error(checkedInOnly ? "No racers are checked in yet." : "There are no racers to export.", status: 409)
@@ -231,7 +232,7 @@ final class WebAPI {
         do {
             try fm.createDirectory(at: temp, withIntermediateDirectories: true)
             let sorted = racers.sorted(by: Racer.displayOrder)
-            let dir = try store.writeExport(sorted, into: temp)
+            let dir = try store.writeExport(sorted, into: temp, for: target)
             let zip = temp.appendingPathComponent("export.zip")
             let ditto = Process()
             ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
